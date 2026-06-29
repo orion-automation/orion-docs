@@ -1,0 +1,85 @@
+---
+title: 任务标记
+description: BPMN 2.0 任务标记的底层定义、多实例并发与顺序遍历机制、补偿处理器及循环支持约束参考。
+---
+
+## 1. 描述 (Description)
+
+在 BPMN 2.0 中，任务标记（Task Markers）用于为标准的活动节点附加额外的执行流控制行为。
+
+在 ORION 平台中，标记可以与不同类型的任务（如 Service Task, User Task）或子流程组合使用。最核心的三种标记为：**多实例 (Multiple Instance)**、**补偿 (Compensation)** 以及 **循环 (Loop)**。
+
+
+
+## 2. 多实例标记 (Multiple Instance)
+
+多实例（MI）是企业级编排中处理批量数据（如“为列表中的每一位审批人生成一个独立任务”）的核心机制。在编程语义上，它等价于 `for-each` 循环。
+
+### 2.1 架构与节点兼容性
+多实例可以作用于几乎所有常规任务（Service, User, Script 等）以及子流程（嵌入式子流程、调用活动、事务子流程）。
+**绝对物理限制**：网关（Gateways）与事件（Events）**永远不能**被声明为多实例。
+
+### 2.2 执行模式与视觉标识
+* **并行多实例 (Parallel)**：底部带有三条垂直线。引擎会为集合中的每个元素瞬间克隆出并行的执行流（Token）。
+* **顺序多实例 (Sequential)**：底部带有三条水平线。引擎会等待当前实例彻底完成后，再启动下一个实例。
+
+### 2.3 引擎底层注入变量 (Built-in Variables)
+当多实例活动启动时，ORION 引擎会在该执行域内自动注入以下严格的生命周期变量（可通过 `execution.getVariable()` 读取）：
+
+| 变量名称 | 作用域 | 数据类型 | 事实描述 |
+| :--- | :--- | :--- | :--- |
+| `nrOfInstances` | 实例集全局 | Integer | 计划执行的实例总数。 |
+| `nrOfActiveInstances` | 实例集全局 | Integer | 当前正在运行、尚未结束的实例数量。顺序多实例中该值永远为 `1`。 |
+| `nrOfCompletedInstances`| 实例集全局 | Integer | 已经成功完成的实例数量。 |
+| `loopCounter` | **局部 (Local)** | Integer | 当前特定实例在整个循环中的索引（从 `0` 开始）。对其他并发实例不可见。 |
+
+### 2.4 数据绑定与遍历契约 (Data Binding)
+要决定多实例循环多少次，ORION 支持以下几种绑定策略：
+
+1. **直接基数 (Loop Cardinality)**
+   不依赖业务集合，直接静态指定或通过表达式计算循环次数。例如 `<loopCardinality>${nrOfOrders - 1}</loopCardinality>`。
+
+2. **BPMN 原生集合 (LoopDataInputRef)**
+   使用原生的 `<loopDataInputRef>` 和 `<inputDataItem>` 进行绑定。缺点是由于 XML Schema 限制，不支持表达式，且变量名难以记忆，**在实战中不推荐使用**。
+
+3. **ORION 扩展集合 (Camunda Extensions - 推荐)**
+   通过属性面板直接配置扩展属性，支持复杂的表达式求值：
+   * `camunda:collection`: 传入一个集合对象或表达式（例如 `${myService.resolveUsers()}`）。
+   * `camunda:elementVariable`: 定义一个局部变量名（如 `assignee`），引擎会在每次迭代时将当前元素的值塞入该变量中。
+
+4. **JSON 数组支持 (SPIN)**
+   结合底层的 Camunda SPIN 库，可以直接遍历 JSON 数组。在配置 collection 表达式时，需调用 SPIN 的专属方法：`${collection.prop('collection').elements()}`。
+
+### 2.5 提前完成条件 (Completion Condition)
+默认情况下，只有当所有克隆的子实例都完成后，多实例活动才算整体结束。但在“投票表决”等场景中，可以通过配置 `<completionCondition>` 表达式实现提前熔断。
+* **机制**：每当一个单独的实例完成时，引擎都会评估该表达式。一旦结果为 `true`（例如 `${nrOfCompletedInstances / nrOfInstances >= 0.6}`，即达到 60% 进度），引擎将**强制销毁所有剩余未完成的活跃实例**，并让执行流沿主干继续向下游推进。
+
+
+## 3. 补偿标记 (Compensation Marker)
+
+如果一个活动专门用于撤销或回滚另一个活动产生的影响，它必须被声明为**补偿处理器 (Compensation Handler)**。
+
+* **视觉标识**：底部带有两个左向三角形（类似倒带键）。
+* **物理隔离墙**：带有补偿标记的任务**脱离正常的业务顺序流**。它绝对不允许拥有任何输入的（Incoming）或输出的（Outgoing）顺序流连线。
+* **唯一触发途径**：它只能通过**定向关联线 (Directed Association)** 挂载在一个节点的补偿边界事件上。它的逻辑仅在流程抛出补偿信号时才会被引擎底层唤醒。
+
+
+## 4. 循环标记 (Standard Loop)
+
+在原生的 BPMN 2.0 规范中，提供了一个带有环形箭头的标准 Loop 标记，用于 `while` 或 `do-while` 语义。
+
+:::caution[引擎架构限制与规避方案]
+在当前的 ORION (Camunda 7) 核心引擎中，**尚未原生支持**标准的 Loop 标记。
+
+**架构师解法**：在处理业务循环时（如“检查状态是否就绪，否则等待并重试”），由于循环次数在运行前往往是未知的，此时不应强行使用“多实例（MI）”，而必须通过**排他网关 (Exclusive Gateway)** 结合物理连线的回退，在流程拓扑图上**显式地画出循环闭环**。
+:::
+
+
+## 5. 引擎级技术属性 (Engine Execution Properties)
+
+多实例活动通常伴随着极高的数据并发吞吐，强烈建议结合以下属性优化数据库事务：
+
+| 属性名称 (UI Label) | 对应 XML 扩展 | 约束与事实描述 |
+| :--- | :--- | :--- |
+| **Async Before/After** | `camunda:async*` | 强制切断数据库事务。对于包含几十上百个元素的并行多实例，**必须开启** Async Before，将瞬间的巨量创建压力卸载到后台 Job 队列异步处理。 |
+| **Exclusive** | `camunda:exclusive` | 确保同一集合内的并发 Job 在分配时不被多线程交叉拾取，防止底层并发操作公共父状态时抛出乐观锁异常。 |

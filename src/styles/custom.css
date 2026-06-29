@@ -1,0 +1,389 @@
+/* ==========================================================================
+   1. 注册英文与中文字体 (IBM Plex Sans & SC)
+   ========================================================================== */
+@font-face {
+	font-family: 'IBM Plex Sans';
+	src: url('../fonts/IBMPlexSans-Regular.woff2') format('woff2');
+	font-weight: 400;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'IBM Plex Sans';
+	src: url('../fonts/IBMPlexSans-Medium.woff2') format('woff2');
+	font-weight: 500;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'IBM Plex Sans';
+	src: url('../fonts/IBMPlexSans-SemiBold.woff2') format('woff2');
+	font-weight: 600;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'IBM Plex Sans';
+	src: url('../fonts/IBMPlexSans-Bold.woff2') format('woff2');
+	font-weight: 700;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'IBM Plex Sans SC';
+	src: url('../fonts/IBMPlexSansSC-Regular.woff2') format('woff2');
+	font-weight: 400;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'IBM Plex Sans SC';
+	src: url('../fonts/IBMPlexSansSC-Medium.woff2') format('woff2');
+	font-weight: 500;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'IBM Plex Sans SC';
+	src: url('../fonts/IBMPlexSansSC-SemiBold.woff2') format('woff2');
+	font-weight: 600;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'IBM Plex Sans SC';
+	src: url('../fonts/IBMPlexSansSC-Bold.woff2') format('woff2');
+	font-weight: 700;
+	font-display: swap;
+}
+
+/* ==========================================================================
+   2. 全局基础变量设定 (字体、字号、边距)
+   ========================================================================== */
+:root {
+	--sl-font: 'IBM Plex Sans', 'IBM Plex Sans SC', system-ui, -apple-system, sans-serif;
+
+	/* 正文文字缩小与排版克制 */
+	--sl-text-5xl: 2.5rem;
+	--sl-text-4xl: 2rem;
+	--sl-text-3xl: 1.6rem;
+	--sl-text-2xl: 1.35rem;
+	--sl-text-xl: 1.15rem;
+
+	/* 统一内容区边距，解决缩进不对齐问题 */
+	--sl-content-pad-x: 1.5rem !important;
+}
+
+@media (min-width: 50rem) {
+	:root {
+		--sl-content-pad-x: 2.5rem !important;
+		/* 大屏下进一步拉宽 */
+	}
+}
+
+.content-panel {
+	font-size: 15px;
+}
+
+.sidebar-content {
+	font-size: 14px;
+}
+
+/* ==========================================================================
+   3. 双模颜色系统 (Dark Mode / Light Mode)
+   ========================================================================== */
+/* Dark mode colors */
+:root {
+	--sl-color-accent-low: #0f214a;
+	--sl-color-accent: #0000ff;
+	--sl-color-accent-high: #afc9fd;
+	--sl-color-white: #ffffff;
+	--sl-color-gray-1: #def1ff;
+	--sl-color-gray-2: #adc6d8;
+	--sl-color-gray-3: #6092b5;
+	--sl-color-gray-4: #2c5d7e;
+	--sl-color-gray-5: #043c5b;
+	--sl-color-gray-6: #002a42;
+	--sl-color-black: #061a28;
+}
+
+/* Light mode colors */
+:root[data-theme='light'] {
+	--sl-color-accent-low: #c3d7ff;
+	--sl-color-accent: #0000ff;
+	--sl-color-accent-high: #112c6d;
+	--sl-color-white: #061a28;
+	--sl-color-gray-1: #002a42;
+	--sl-color-gray-2: #043c5b;
+	--sl-color-gray-3: #2c5d7e;
+	--sl-color-gray-4: #6092b5;
+	--sl-color-gray-5: #adc6d8;
+	--sl-color-gray-6: #e1deff;
+	--sl-color-gray-7: #eef8ff;
+	--sl-color-black: #ffffff;
+}
+
+/* ==========================================================================
+   4. UI 组件修复与定制 (语言选择器、主按钮、正文间距)
+   ========================================================================== */
+/* 修复语言选择器文本截断 */
+starlight-lang-select {
+	max-width: none !important;
+}
+
+starlight-lang-select select {
+	width: auto !important;
+	max-width: 7rem !important;
+	min-width: 4.5rem !important;
+	text-overflow: clip !important;
+}
+
+.sl-link-button {
+	/* 保持上下 0.75rem 不变，将左右从 1rem 增加到 1.5rem */
+	padding: 0.75rem 1.5rem !important;
+
+	/* 保持原本的平滑过渡效果 */
+	transition: all 0.2s ease !important;
+}
+
+/* 完美适配双模的科技蓝主按钮 */
+.sl-link-button.primary {
+	background-color: var(--sl-color-accent) !important;
+	border-color: var(--sl-color-accent) !important;
+	color: #ffffff !important;
+	/* 无论什么模式，蓝底必须配白字 */
+}
+
+.sl-link-button.primary:hover {
+	background-color: #0000cc !important;
+	border-color: #0000cc !important;
+	text-decoration: none !important;
+}
+
+/* 精准规范正文 Panel 与顶部 Header 的对齐 */
+.content-panel:where(.astro-oil7k7jf),
+.content-panel {
+	padding: 1.5rem var(--sl-content-pad-x) !important;
+}
+
+@media (min-width: 50rem) {
+
+	.content-panel:where(.astro-oil7k7jf),
+	.content-panel {
+		padding-top: 1.5rem !important;
+	}
+}
+
+/* ==========================================================================
+   5. Splash 首页定制
+   ========================================================================== */
+div[data-template="splash"] h1:where(.astro-q2ezz3gc),
+div[data-template="splash"] .hero h1,
+h1[id="_top"] {
+	font-size: 2.5rem !important;
+	line-height: 1.2 !important;
+}
+
+/* ==========================================================================
+   6. 智能卡片系统 (可点击超链接卡片)
+   ========================================================================== */
+/* 基础可点击容器动效 */
+a.orion-clickable-card {
+	text-decoration: none !important;
+	color: inherit !important;
+	display: block;
+	transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+a.orion-clickable-card:hover {
+	transform: translateY(-2px);
+}
+
+a.orion-clickable-card:hover .card {
+	border-color: var(--sl-color-accent) !important;
+	background-color: var(--sl-color-accent-low) !important;
+}
+
+/* 移除官方图标的默认方框 */
+.card:where(.astro-zts4jgjd) .icon:where(.astro-zts4jgjd),
+.card .icon {
+	border: none !important;
+	background-color: transparent !important;
+	padding: 3px !important;
+	color: var(--sl-color-accent) !important;
+}
+
+/* --- 卡片排版与间距极致压缩 --- */
+.card {
+	gap: 0.2rem !important;
+}
+
+.card .title,
+.card h3 {
+	margin-bottom: 0 !important;
+	padding-bottom: 0 !important;
+}
+
+.card .body,
+.card p:not(.title) {
+	margin-top: 0 !important;
+	padding-top: 0 !important;
+}
+
+/* --- 卡片内文字双模颜色精准控制 --- */
+/* 统一标题颜色 (因为你的变量 --sl-color-white 在亮色下是深蓝，暗色下是白，直接用它最完美) */
+.orion-clickable-card .card .title,
+.orion-clickable-card .card h3,
+.orion-clickable-card .card p.title {
+	color: var(--sl-color-white) !important;
+	font-weight: 600 !important;
+}
+
+/* 精准锁定描述文本（使用 :not(.title) 防止误杀），使其变灰拉开层级 */
+.orion-clickable-card .card .body,
+.orion-clickable-card .card p:not(.title) {
+	color: var(--sl-color-gray-3) !important;
+	font-weight: 400 !important;
+}
+
+
+/* ==========================================================================
+   7. 横向长条资源卡片 (Additional Resources)
+   ========================================================================== */
+.orion-horizontal-links .orion-clickable-card {
+	display: block !important;
+	height: 100% !important;
+}
+
+.orion-horizontal-links .orion-clickable-card .card {
+	position: relative !important;
+	display: flex !important;
+	flex-direction: column !important;
+	justify-content: center !important;
+	height: 100% !important;
+	padding-left: 5rem !important;
+	padding-top: 1rem !important;
+	padding-bottom: 1rem !important;
+	/* 稍微压缩上下边距 */
+	min-height: 6.5rem !important;
+}
+
+/* 放大横向卡片的标题 */
+.orion-horizontal-links .orion-clickable-card .card .title,
+.orion-horizontal-links .orion-clickable-card .card p.title {
+	font-size: 1.15rem !important;
+}
+
+/* 左侧绝对居中图标 */
+.orion-horizontal-links .custom-card-icon {
+	position: absolute !important;
+	left: 1.5rem !important;
+	top: 50% !important;
+	transform: translateY(-50%) !important;
+	width: 2rem !important;
+	height: 2rem !important;
+	color: var(--sl-color-accent) !important;
+	background-color: transparent !important;
+	border: none !important;
+	padding: 0 !important;
+}
+
+/* 描述文字微调 */
+.orion-horizontal-links .orion-clickable-card .card .body,
+.orion-horizontal-links .orion-clickable-card .card p:not(.title) {
+	margin-top: 0.2rem !important;
+	line-height: 1.4 !important;
+}
+
+/* ==========================================================================
+   16. 进阶修复：精准锁定 Starlight 的 Heading 容器进行间距重塑
+   ========================================================================== */
+
+/* 1. 强力修正 h2 (##) 的间距，命中 sl-heading-wrapper */
+.sl-heading-wrapper.level-h2 {
+	margin-top: 3.5rem !important;
+	/* 顶部呼吸感 */
+	margin-bottom: 0rem !important;
+	/* 标题与段落间距 */
+	display: block !important;
+	/* 确保它是块级元素 */
+}
+
+/* 2. 强力修正 h3 (###) 的间距 */
+.sl-heading-wrapper.level-h3 {
+	margin-top: 1rem !important;
+	margin-bottom: 0rem !important;
+	display: block !important;
+}
+
+/* 3. 针对页面开头的首个标题进行微调 (防止页面顶部留白过大) */
+/* 使用 :first-of-type 来匹配 .content-panel 内的第一个标题 */
+.content-panel>.sl-heading-wrapper:first-of-type {
+	margin-top: 0.5rem !important;
+}
+
+
+/* ==========================================================================
+   18. 专业版引用样式 (增加来源与学术严谨性)
+   ========================================================================== */
+.stoic-quote {
+	border-left: 2px solid var(--sl-color-accent);
+	padding: 1rem 0 1rem 1rem;
+	/* 增加上下空间 */
+	margin: 0;
+	border-radius: 0 0.25rem 0.25rem 0;
+}
+
+.stoic-quote p {
+	font-size: 1rem;
+	line-height: 1.2;
+	margin-bottom: 0.8rem !important;
+	color: var(--sl-color-white);
+	font-weight: 400;
+}
+
+.stoic-quote cite {
+	display: block;
+	color: var(--sl-color-gray-4);
+	/* 使用更浅的颜色，拉开层级 */
+	font-style: normal;
+}
+
+.stoic-quote cite a {
+	color: var(--sl-color-accent-high) !important;
+	text-decoration: none;
+	border-bottom: 1px dotted var(--sl-color-accent-high);
+	/* 虚线连接，比实线下划线更高级 */
+	transition: opacity 0.2s;
+}
+
+.stoic-quote cite a:hover {
+	opacity: 0.7;
+}
+
+/* ==========================================================================
+   22. 首页末尾 Wiki 彩蛋样式
+   ========================================================================== */
+.orion-wiki-section {
+  margin-top: 8rem; /* 与上方内容拉开足够距离 */
+  opacity: 0.8;
+}
+
+.orion-wiki-section hr {
+  border: 0;
+  border-top: 1px dashed var(--sl-color-gray-4) !important;
+  margin-bottom: 1.5rem;
+}
+
+.orion-wiki-section p {
+  
+  line-height: 1.6 !important;
+  color: var(--sl-color-gray-4) !important;
+  text-align: left;
+   
+}
+
+.orion-wiki-section strong {
+  color: var(--sl-color-gray-3) !important;
+  letter-spacing: 0.05em;
+}

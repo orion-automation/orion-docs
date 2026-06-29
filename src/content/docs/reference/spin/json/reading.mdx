@@ -1,0 +1,356 @@
+---
+title: 操作 JSON 数据
+description: Camunda Spin 库读取、提取、设置及操作 JSON 对象与数组的底层 API 规范参考。
+---
+
+## 1. 读取 JSON 数据 (Reading JSON)
+
+Camunda Spin 原生支持从字符串（Strings）或字符流（Readers）中读取并解析 JSON 数据。
+
+### 1.1 从字符串读取 (Reading from a String)
+在 Java 环境中，可以通过以下全局静态方法将标准 JSON 字符串转换为引擎可识别的对象：
+
+* **显式声明格式**: 使用 `S()` 方法并传入 `json()` 参数，以提示 Spin 使用 JSON 数据格式进行解析。
+
+```java
+  import static org.camunda.spin.Spin.*;
+  import static org.camunda.spin.DataFormats.*;
+
+  SpinJsonNode json = S("{\"customer\": \"Kermit\"}", json());
+
+```
+
+* **快捷函数**: 直接使用 `JSON()` 函数进行解析。
+```java
+import static org.camunda.spin.Spin.*;
+
+SpinJsonNode json = JSON("{\"customer\": \"Kermit\"}");
+
+```
+
+
+* **基础原生类型 (Primitive Values)**: 可以直接读取代表 JSON 基础类型的字符串。例如，`JSON("true")` 将直接返回一个表示布尔值 `true` 的 `SpinJsonNode`。
+
+### 1.2 从字符流读取 (Reading from a Reader)
+
+Spin 支持直接从 `java.io.Reader` 的实例中读取 JSON 数据：
+
+* **API 调用**: 支持 `S(reader, json())` 或 `JSON(reader)` 方法。
+* **文件读取示例**:
+```java
+import static org.camunda.spin.Spin.*;
+
+FileInputStream fis = new FileInputStream("/tmp/customer.json");
+InputStreamReader reader = new InputStreamReader(fis, "utf-8");
+SpinJsonNode json = JSON(reader);
+
+```
+
+
+
+### 1.3 在脚本语言中读取 (Reading using a Script Language)
+
+在脚本语言（如 JavaScript）中读取 JSON 的方式与 Java 类似。由于脚本语言使用动态类型，在调用时无需显式提示数据格式，引擎支持自动探测。
+
+* **JavaScript 示例**:
+```javascript
+var customer = S('{"customer": "Kermit"}');
+
+```
+
+
+
+## 2. 读取 JSON 属性 (Reading JSON Properties)
+
+要从 JSON 树中提取特定属性，可以使用 `.prop("name")` 方法。该方法返回一个 `SpinJsonNode` 对象，随后可基于此节点获取具体的属性值。
+
+### 2.1 Java 示例
+
+```java
+import static org.camunda.spin.Spin.*;
+
+SpinJsonNode json = JSON("{\"customer\": \"Kermit\"}");
+SpinJsonNode customerProperty = json.prop("customer");
+String customerName = customerProperty.stringValue();
+
+```
+
+### 2.2 JavaScript 示例
+
+```javascript
+var json = S('{"customer": "Kermit"}');
+var customerProperty = json.prop("customer");
+var customerName = customerProperty.value();
+
+```
+
+## 3. 数值类型与类型检查 (The Different Value Types)
+
+Spin 提供了多种方法将 `SpinJsonNode` 转换为原生的 Java 类型，并进行类型安全检查。
+
+### 3.1 提取原生值
+
+* **`value()`**: 获取 String、Boolean、Number 或 null JSON 属性的 Java 等效值。如果对 Object 或 Array 属性调用此方法，将抛出异常。
+* **`stringValue()`**: 获取值的 Java String 表示形式；如果值不是 String，则抛出异常。
+* **`numberValue()`**: 获取值的 Java Number 表示形式；如果值不是 Number，则抛出异常。
+* **`boolValue()`**: 获取值的 Java Boolean 表示形式；如果值不是 Boolean，则抛出异常。
+
+### 3.2 节点类型检查 (Type Checks)
+
+以下方法用于检查当前节点的底层类型，均返回布尔值：
+
+* `isObject()`
+* `hasProp()`
+* `isBoolean()`
+* `isNumber()`
+* `isString()`
+* `isNull()`
+* `isValue()`
+* `isArray()`
+* **JavaScript 检查示例**:
+```javascript
+var json = S('{"over18":false}');
+json.prop('over18').isBoolean() // 返回 true
+
+```
+
+
+
+## 4. 获取数据数组 (Fetch Array of Data)
+
+如果 JSON 属性是一个数据数组，可以提取该节点下的所有元素。
+
+### 4.1 Java 示例
+
+使用 `.elements()` 将数组转化为 `SpinList`：
+
+```java
+import static org.camunda.spin.Spin.*;
+
+SpinJsonNode json = JSON("{\"customer\": [\"Kermit\", \"Waldo\"]}");
+SpinJsonNode customerProperty = json.prop("customer");
+SpinList customers = customerProperty.elements();
+
+SpinJsonNode customer = customers.get(0);
+String customerName = customer.stringValue();
+
+```
+
+### 4.2 JavaScript 示例
+
+```javascript
+var json = S('{"customer": ["Kermit", "Waldo"]}');
+var customerProperty = json.prop("customer");
+
+var customers = customerProperty.elements();
+var customer = customers.get(0);
+var customerName = customer.value();
+
+```
+
+## 5. 获取字段名称 (Fetch Field Names)
+
+使用 `.fieldNames()` 方法可以获取一个节点中所有子节点和属性的名称列表。
+
+### 5.1 Java 示例
+
+```java
+import static org.camunda.spin.Spin.*;
+
+SpinJsonNode json = JSON("{\"customer\": [\"Kermit\", \"Waldo\"]}");
+ArrayList fieldNames = json.fieldNames();
+String fieldName1 = fieldNames.get(0);
+
+```
+
+### 5.2 JavaScript 示例
+
+```javascript
+var json = S('{"customer": ["Kermit", "Waldo"]}');
+var fieldNames = json.fieldNames();
+var fieldName1 = fieldNames.get(0);
+
+```
+
+## 6. 设置 JSON 属性 (Set JSON Properties)
+
+使用 `.prop("name", object)` 方法可以设置或更新 JSON 节点的属性。
+
+### 6.1 支持的简单类型 (Simple Types)
+
+* **String**: `.prop("name", "Waldo")`
+* **Integer**: `.prop("age", 42)`
+* **Long**: `.prop("period", 4200000000)`
+* **Float**: `.prop("price", 42.00)`
+* **Boolean**: `.prop("active", true)`
+
+### 6.2 支持的容器类型 (Container Types)
+
+可以传入 Array 或 Object 类型的容器。
+
+* **设置数组 (Array)**：
+* **Java**:
+```java
+SpinJsonNode json = JSON("{\"customer\": [\"Kermit\", \"Waldo\"]}");
+ArrayList<Object> list = new ArrayList<Object>();
+list.add("new entry");
+list.add("new entry2");
+json.prop("new_array", list);
+
+```
+
+
+* **JavaScript**:
+```javascript
+var json = S('{"customer": ["Kermit", "Waldo"]}');
+var list = ["new entry", "new entry2"];
+json.prop("new_array", list);
+
+```
+
+
+
+
+* **设置对象 (Object)**：
+* **Java**:
+```java
+SpinJsonNode json = JSON("{\"customer\": [\"Kermit\", \"Waldo\"]}");
+Map<String, Object> object = new HashMap<String, Object>();
+object.put("new_entry", 42);
+object.put("new_entry2", "Yeah!");
+json.prop("new_object", object);
+
+```
+
+
+* **JavaScript**:
+```javascript
+var json = S('{"customer": ["Kermit", "Waldo"]}');
+var object = {
+  "new_entry": 1,
+  "new_entry2": "Yeah!"
+};
+json.prop("new_array", object);
+
+```
+
+
+
+
+
+## 7. 移除 JSON 属性 (Remove JSON Properties)
+
+存在两种方法用于从 JSON 对象中移除属性：
+
+* `.deleteProp("name")`: 移除具有指定名称的单一属性。
+* `.deleteProp(<List of names>)`: 移除包含在列表中的一个或多个属性。
+
+### 7.1 Java 示例
+
+```java
+SpinJsonNode json = JSON("{\"customer\": \"Kermit\", \"language\": \"en\"}");
+List<String> listOfNames = new ArrayList<String>();
+listOfNames.add("customer");
+listOfNames.add("language");
+
+// 仅移除 customer 属性
+json.deleteProp("customer");
+
+// 移除 customer 和 language 属性
+json.deleteProp(listOfNames);
+
+```
+
+### 7.2 JavaScript 示例
+
+```javascript
+var json = S('{"customer": ["Kermit", "Waldo"], "language": "en"}');
+var list = ["customer", "en"];
+
+// 仅移除 customer 属性
+json.deleteProp("customer");
+
+// 移除 customer 和 language 属性
+json.deleteProp(list);
+
+```
+
+## 8. 操作 JSON 数组 (Work with JSON Arrays)
+
+JSON 数组表示对象的列表。Spin 提供了以下方法来高速操作这些列表：
+
+### 8.1 数组操作 API
+
+* `.indexOf(<Object>)`: 获取搜索对象首次出现的索引。
+* `.lastIndexOf(<Object>)`: 获取搜索对象最后一次出现的索引。
+* `.append(<Object>)`: 将对象追加到列表末尾。
+* `.insertAt(<Index>, <Object>)`: 在列表的特定索引处插入对象。
+* `.insertBefore(<Search object>, <Object>)`: 在首次出现的目标对象之前插入新对象。
+* `.insertAfter(<Search object>, <Object>)`: 在首次出现的目标对象之后插入新对象。
+* `.remove(<Object>)`: 移除该对象的首次出现。
+* `.removeLast(<Object>)`: 移除该对象的最后一次出现。
+* `.removeAt(Index)`: 移除指定索引处的列表条目。
+
+### 8.2 示例 1：获取索引位置
+
+以下示例基于 JSON 数组 `{"test-array" : ["testdata1","testdata2",1,2,true,1,false,1]}`：
+
+* **Java**:
+```java
+SpinJsonNode json = JSON("{\"test-array\" : [\"testdata1\",\"testdata2\",1,2,true,1,false,1]}");
+SpinJsonNode list = json.prop("test-array");
+
+Integer i = list.indexOf("testdata2"); // 结果为 1
+Integer j = list.lastIndexOf(1);       // 结果为 7
+
+```
+
+
+* **JavaScript**:
+```javascript
+var json = S('{"test-array" : ["testdata1","testdata2",1,2,true,1,false,1]}');
+var list = json.prop("test-array");
+
+var i = list.indexOf("testdata2"); // 结果为 1
+var j = list.lastIndexOf(1);       // 结果为 7
+
+```
+
+
+
+### 8.3 示例 2：添加与移除数据
+
+* **Java**:
+```java
+SpinJsonNode json = JSON("{\"test-array\" : [\"testdata1\",\"testdata2\",1,2,true,1,false,1]}");
+SpinJsonNode list = json.prop("test-array");
+
+list.append("test2"); // 末尾现在有 "test2"
+list.remove("test2"); // 移除 "test2"
+
+list.insertAt(1, "test3"); // "test3" 被插入在 "testdata2" 之前
+list.removeAt(1);          // 移除索引 1 处的条目
+
+list.insertBefore(true, "test4"); // "test4" 位于索引 4
+list.insertAfter(true, 5);        // 5 位于索引 6
+
+```
+
+
+* **JavaScript**:
+```javascript
+var json = S('{"test-array" : ["testdata1","testdata2",1,2,true,1,false,1]}');
+var list = json.prop("test-array");
+
+list.append("test2"); // 末尾现在有 "test2"
+list.remove("test2"); // 移除 "test2"
+
+list.insertAt(1, "test3"); // "test3" 被插入在 "testdata2" 之前
+list.removeAt(1);          // 移除索引 1 处的条目
+
+list.insertBefore(true, "test4"); // "test4" 位于索引 4
+list.insertAfter(true, 5);        // 5 位于索引 6
+
+```
+
+

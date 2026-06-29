@@ -1,0 +1,73 @@
+---
+title: 空开始事件
+description: BPMN 2.0 默认开始事件的基础属性、表单契约绑定、系统实例化机制与引擎刚性约束参考。
+---
+
+## 1. 描述 (Description)
+
+空开始事件（None Start Event / Blank Start Event）是不包含任何特定触发器（如定时器、消息、信号、条件）的默认起始节点。它表示流程处于被动等待状态，需要由外部调用（如 ORION API 显式请求、用户提交启动表单、或上层父流程流转调用）进行实例化。
+
+在 ORION 平台中，它是建立系统初始契约并向流程内注入全局资源变量（Variables）的显式入口。
+
+
+## 2. 核心配置属性 (Core Properties)
+
+| 属性名称 (UI Label) | 对应 XML / 扩展属性 | 数据类型 | 描述与系统行为 |
+| :--- | :--- | :--- | :--- |
+| **发起人 (Initiator)** | `camunda:initiator` | String | 指定一个变量名（如 `starterId`）。引擎会在流程启动时，自动将当前通过鉴权的启动者 ID 赋值给该变量，用于后续合规追溯。 |
+| **表单引用 (Form Ref)** | `camunda:formRef` | String | 绑定 Camunda 内部部署的结构化表单（Camunda Forms）的 ID。 |
+| **表单绑定 (Binding)** | `camunda:formRefBinding`| 枚举 | 当使用 Form Ref 时，指定版本绑定策略（`latest`, `deployment`, `version`）。 |
+
+:::tip[参数注入]
+在触发空开始事件时，外部系统通常会携带一个 JSON Payload，这些数据将作为根级全局变量（Global Variables）随 Token 一并注入流程实例中。
+:::
+
+
+## 3. 表单契约绑定机制 (Form Contract Binding)
+
+在 ORION 平台中，空开始事件是拉起初始业务输入界面的核心节点。系统推荐通过 `Form Key` 属性来实现前端 UI 契约与底层引擎的深度解耦。
+
+### 3.1 表单类型 (Form Type)
+在属性面板中配置表单关联时，需指定表单的集成模式。当选择以下两种模式之一时，面板将显式暴露出 `Form Key` 配置字段：
+*   **Embedded Form (嵌入式表单)**：依托于本地上下文或轻量级内部容器渲染的表单模式。
+*   **External Task Form (外部任务表单)**：声明该表单由完全独立的外部应用程序接管处理。
+
+### 3.2 Form Key 赋值规范与系统行为
+`Form Key` 字段是一个高度灵活的字符串指针，用于定位具体的表单资源。其取值遵循以下两种标准范式：
+
+*   **ORION 原生表单映射**：直接填写由 ORION 表单设计器（Form Designer）自动生成的 **UX Key**。系统在发起流程前，将根据此 Key 从组件库中检索并渲染对应的原生表单。
+*   **第三方 UI 自定义增强（平台推荐）**：将 `Form Key` 作为前端路由标识或资源标识符（如 `app:contract-start-v2`）。前端应用在拉取到该节点的 Key 时，可直接接管渲染逻辑，展示第三方业务系统的前端页面。**ORION 平台强烈推荐采用此范式**，以满足复杂企业级环境下的前端架构扩展与异构系统融合需求。
+
+
+## 4. 引擎级技术属性 (Engine Execution Properties)
+
+以下属性决定了流程实例化时，底层线程和数据库事务的物理行为。
+
+| 属性名称 (UI Label) | 数据类型 | 默认值 | 约束与事实描述 |
+| :--- | :--- | :--- | :--- |
+| **Async Before** | Boolean | `false` | 若勾选，客户端发起启动请求后，引擎仅将命令写入数据库即刻返回（HTTP 200）。流程的实际实例化交由后台 Job Executor 异步执行。 |
+| **Async After** | Boolean | `false` | 若勾选，引擎在生成 Token 并准备离开此节点前截断数据库事务。 |
+| **Exclusive** | Boolean | `true` | （配合 Async 使用）确保同一实例的异步任务不会被并发拾取，防止脏读和乐观锁异常。 |
+
+:::caution[高并发启动建议]
+在面对“瞬时洪峰”的实例化场景（如大批量触发 ORION IoT Agent 流转）时，强烈建议开启 `Async Before`。这能极大降低主调方接口的响应延迟，将计算压力转移至后端的异步队列中。
+:::
+
+
+## 5. 上下文与结构约束 (Contextual Constraints)
+
+开始事件（Start Events）定义了流程（Process）或子流程（Sub Process）启动的边界。引擎底层对开始事件的组合与数量有着严格的刚性限制：
+
+### 5.1 流程定义级基准约束 (Process Definition Constraints)
+*   **最低存在限制**：流程引擎要求每个流程定义中**必须至少包含一个**开始事件（Start Event），否则无法完成流程的实例化部署。
+*   **排他数量限制**：在一个独立的流程定义（Process Definition）中，**最多只能包含一个**空开始事件（Blank Start Event）或定时开始事件（Timer Start Event）。
+*   **多入口机制**：虽然空/定时开始事件有唯一性限制，但在同一流程定义中，允许同时存在**多个**消息开始事件（Message Start Event）或信号开始事件（Signal Start Event）作为多元并行的启动入口。
+
+### 5.2 标准嵌入式子流程约束 (Embedded Sub-process)
+*   **支持度**：完全支持。
+*   **数量限制**：一个标准子流程内部**必须包含且只能包含一个**空开始事件。当父执行流（Token）到达子流程边界时，通过该空开始事件进入子流程作用域。
+*   **特殊限制**：子流程内部的空开始事件**不可**配置 `Initiator` 和任何表单属性（如 `Form Key`）。
+
+### 5.3 事件子流程约束 (Event Sub-process)
+*   **支持度**：**绝对禁止**。
+*   **系统行为**：事件子流程是被动捕获异常或全局事件的域，必须由特定触发器（如 Error, Message, Timer）激活，不支持且无法放置空开始事件。

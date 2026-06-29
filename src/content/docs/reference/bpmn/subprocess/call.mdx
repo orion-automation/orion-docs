@@ -1,0 +1,75 @@
+---
+title: 调用活动
+description: BPMN 2.0 调用活动的底层定义、独立实例生命周期、变量映射传递与版本绑定参考。
+---
+
+## 1. 描述 (Description)
+
+调用活动（Call Activity）用于在当前流程执行期间，调用并启动一个**完全独立且外部的**可复用流程定义（或 CMMN 案例定义）。
+
+在 ORION 平台中，必须严格区分“嵌入式子流程”与“调用活动”的架构边界：
+* **嵌入式子流程**：依附于当前主流程，共享同一个流程实例与数据库记录，侧重于逻辑降维与局部事件隔离。
+* **调用活动**：被调用的是一个独立部署的流程。当执行流到达调用活动时，ORION 引擎会**创建一个全新的流程实例（Process Instance）**。主流程实例会在此挂起并等待，直到这个子实例完全结束，主流程才会继续向下执行。它是实现跨部门、跨业务线流程复用（如将“标准信用评级”剥离为公共服务）的标准方案。
+
+
+## 2. 核心调用与版本绑定契约 (Binding & Versioning)
+
+调用活动的核心属性在于精确指示引擎“去哪里找哪个版本的外部流程”。
+
+| 属性名称 (UI Label) | 对应 XML / 扩展 | 数据类型 | 事实描述与约束 |
+| :--- | :--- | :--- | :--- |
+| **调用元素 (Called Element)** | `calledElement` | String | **必填**。被调用的外部流程定义的唯一键值（Process Definition Key）。引擎将在运行时动态解析该键值。 |
+| **绑定策略 (Binding)** | `camunda:calledElementBinding` | 枚举 | 决定引擎在运行时选择哪个版本的外部流程。默认为 `latest`。 |
+| **特定版本 (Version)** | `camunda:calledElementVersion` | String | （仅当 Binding 为 `version` 时必填）指定一个静态或动态计算的绝对版本号。 |
+| **版本标签 (Version Tag)** | `camunda:calledElementVersionTag`| String | （仅当 Binding 为 `versionTag` 时必填）指定一个具有业务语义的发布标签（如 `v1.0.2`）。 |
+
+### 2.1 绑定策略详述 (Binding Strategies)
+* **latest (最新版)**：永远调用系统中最新部署的该流程版本。
+* **deployment (同批次部署)**：强制调用与当前主流程属于同一个 Deployment（部署包）中的版本。用于保证相互依赖的父子流程版本强一致性。
+* **version / versionTag (精确锁定)**：调用指定的固定版本或标签。支持静态写入，或通过表达式（如 `${targetVersion}`）在运行时动态决定。
+
+### 2.2 多租户解析机制 (Multi-Tenancy Resolution)
+在 SaaS 化部署中，调用活动必须解决租户隔离问题：
+* **默认继承**：默认情况下，引擎使用 **调用方流程定义（Definition）** 的租户 ID 去寻找被调用的流程。
+* **显式越权 (`camunda:calledElementTenantId`)**：允许通过配置强行覆盖默认行为。例如，使用表达式 `${execution.tenantId}` 让其跟随当前运行实例的租户，或者硬编码 `TENANT_A` 强制调用特定租户的公共流程。
+
+
+## 3. 变量穿透与隔离机制 (Variable Mapping)
+
+由于调用活动创建了全新的物理实例，父子流程之间的内存是**绝对物理隔离**的。必须通过属性面板显式配置变量的输入（In）与输出（Out）映射。
+
+### 3.1 基础映射 (Standard Mapping)
+* **传递入参 (`camunda:in`)**：在子流程启动瞬间，将父流程的变量深拷贝至子流程。支持传递 `Source`（源变量名）、`Source Expression`（计算表达式）或 `variables="all"`（全量传递）。
+* **回写出参 (`camunda:out`)**：在子流程成功结束瞬间，将其内部的变量回写至父流程的最高作用域。
+
+### 3.2 局部隔离与 I/O 组合 (Local Isolation with I/O)
+在极度注重变量污染防范的企业级架构中，推荐将 `camunda:in variables="all"` 配合 `local="true"` 以及 **Input/Output 参数** 组合使用：
+1. 首先在面板的 Input Parameters 中定义当前节点专用的局部入参。
+2. 配置 `<camunda:in variables="all" local="true" />`。
+3. **底层行为**：引擎将**仅仅**把第一步声明的这些局部变量传递给子流程，从而完美屏蔽父流程中成百上千的无关全局变量，实现干净的上下文交接。
+
+### 3.3 业务键传递 (Business Key Passing)
+* **单向传递**：可以通过 `<camunda:in businessKey="#{execution.processBusinessKey}" />` 将主流程的业务键（如订单号）传递给子实例。
+* **只读约束**：业务键在底层数据库实例创建后不可逆转，因此**绝对不允许**通过 `out` 映射将子流程的业务键回写给父流程。
+
+### 3.4 错误冒泡与变量回写 (Error Event Output)
+如果子流程内部抛出了 BPMN 错误事件（Error Event），并且该错误被父流程中的边界错误事件成功捕获，ORION 引擎**依然会执行输出映射（Out Mappings）**。这意味着必须确保父级能够兼容处理子流程因异常中断而导致的 `null` 值变量。
+
+
+## 4. 高阶：委派变量映射 (Delegated Variable Mapping)
+
+当数据转换逻辑过于复杂，甚至需要查询外部数据库才能组装入参时，可以通过 Java 委托全面接管变量传递生命周期。
+
+* **Java 类引用 (`camunda:variableMappingClass`)**：提供实现了 `DelegateVariableMapping` 接口的完整类路径。
+* **表达式委托 (`camunda:variableMappingDelegateExpression`)**：通过 Spring/CDI Bean 解析，例如 `${customVariableMapper}`。
+引擎在出入参阶段会回调该接口的 `mapInputVariables` 与 `mapOutputVariables` 方法。
+
+
+## 5. 引擎级技术属性 (Engine Execution Properties)
+
+| 属性名称 (UI Label) | 对应 XML 扩展 | 约束与事实描述 |
+| :--- | :--- | :--- |
+| **Async Before** | `camunda:asyncBefore` | 强制切断数据库事务。由于启动新流程实例涉及大量数据库 `INSERT` 操作，强烈建议在此节点开启异步，避免主流程事务超时。 |
+| **Async After** | `camunda:asyncAfter` | 强制在子流程结束、执行流返回主流程前切断事务。 |
+| **Exclusive** | `camunda:exclusive` | 确保同一流程实例的异步并发 Job 不被交叉拾取。 |
+| **CMMN 案例引用** | `camunda:caseRef` | 调用活动同样支持调用 CMMN（案例管理）定义，使用此属性替代 `calledElement` 即可，生命周期等待逻辑完全一致。 |

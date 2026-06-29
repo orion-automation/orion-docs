@@ -1,0 +1,74 @@
+---
+title: 定时器事件
+description: BPMN 2.0 定时器事件的基础属性、XML 规范与引擎执行行为参考。
+---
+
+## 1. 描述 (Description)
+
+定时器事件（Timer Events）是由时间条件触发的 BPMN 2.0 基础事件组件。在 ORION 平台中，定时器的底层调度与触发严格依赖于 Camunda 7 引擎的 Job Executor 组件。它主要用于基于时间的流程实例化、执行流（Token）的挂起等待，以及业务 SLA 超时的边界阻断。
+
+
+## 2. 核心定义属性 (Timer Definitions)
+
+所有定时器事件共享相同的底层时间计算核心。在属性面板的 **Timer Definition Type** （计时器类型）中，支持三种国际标准的时间解析协议。
+
+| 模式 (UI Label) | XML 元素 | 格式规范 | 系统行为描述 |
+| :--- | :--- | :--- | :--- |
+| **具体时间 (Date)** | `<timeDate>` | ISO 8601 日期时间 | 在指定的绝对时间点精确触发一次。 |
+| **持续时间 (Duration)** | `<timeDuration>` | ISO 8601 持续时间 | 引擎从执行流到达该节点的时刻起，等待指定的时长后触发。 |
+| **循环周期 (Cycle)** | `<timeCycle>` | ISO 8601 循环 或 CRON | 按预设的周期频率重复触发动作。 |
+
+### 表达式格式示例
+
+*   **ISO 8601 日期 (Date)**: `2026-10-02T08:00:00Z` （UTC 时间 2026年10月2日 早8点）
+*   **ISO 8601 时长 (Duration)**: `PT1H30M` （1小时30分钟）、`P14D` （14天）
+*   **ISO 8601 循环 (Cycle)**: `R3/PT10H` （重复 3 次，每次间隔 10 小时）
+*   **CRON 表达式 (Cycle)**: `0 0 8 * * ?` （每天早晨 8 点触发）
+
+:::tip[表达式求值]
+上述所有属性均支持使用 ORION 表达式语言（如 `${timerInterval}`），允许在运行时通过企业变量（Variables）动态注入时间契约。
+:::
+
+
+## 3. 节点级应用行为与约束 (Contextual Behaviors)
+
+虽然共享相同的时间解析内核，但定时器在不同 BPMN 节点上的系统行为受到严格的架构约束。
+
+### 3.1 定时开始事件 (Timer Start Event)
+用于在满足时间条件时，自动创建一个全新的流程实例（Process Instance）。
+
+*   **适用层级**：顶级流程（Top-level Process）或事件子流程（Event Sub-process）。不支持标准子流程。
+*   **属性约束**：
+    *   **必须**使用 `timeDate` 或 `timeCycle`。
+    *   **绝对禁止**使用 `timeDuration`（因流程尚未启动，引擎无法获取相对计算的基准时间戳）。
+
+### 3.2 定时中间捕获事件 (Timer Intermediate Catch Event)
+当执行流（Token）抵达该节点时，流程状态被持久化，当前事务结束，Token 进入挂起状态，直到时间条件满足。
+
+*   **系统行为**：只触发一次。
+*   **属性约束**：支持 Date、Duration 和 Cycle。
+*   **特殊注意**：若在此处配置 `timeCycle`，引擎底层仅会将其解析为一次 `timeDuration`，触发一次后执行流即离开该节点。
+
+### 3.3 定时边界事件 (Timer Boundary Event)
+依附于任务（如 User Task、Service Task）的边界，用于监控执行过程中的超时事件（SLA 控制）。
+
+*   **特有属性：Cancel Activity (中断标志)**
+    *   `true` **(中断型)**：定时器到期时，引擎将强制销毁当前主任务及其所有局部变量，执行流沿边界连线离开（常用于订单超时未支付自动取消）。
+    *   `false` **(非中断型)**：定时器到期时，主任务保留继续执行，引擎额外派生出一条并行的执行流（常用于 SLA 预警通知，而不打断原审批流）。
+*   **循环限制**：只有**非中断型**（Cancel Activity = false）的边界事件，其 `timeCycle` 才能真正发挥周期性重复触发的作用。
+
+
+## 4. 引擎技术属性 (Engine Execution Properties)
+
+以下属性位于面板的扩展配置区，直接决定该节点在 Camunda 7 数据库与线程池中的行为。
+
+| 属性名称 (UI Label) | 数据类型 | 默认值 | 约束与事实描述 |
+| :--- | :--- | :--- | :--- |
+| **Async Before** | Boolean | `false` | 强制在此事件被处理前切断数据库事务。由 Job Executor 异步接管。 |
+| **Async After** | Boolean | `false` | 强制在此事件被处理后切断数据库事务。 |
+| **Exclusive** | Boolean | `true` | （需开启 Async）确保同一流程实例中的异步 Job 不会被多个线程并发拾取，避免乐观锁异常。 |
+| **Job Priority** | Integer / String | `null` | 覆盖 Job Executor 的默认优先级。数值越大，被线程池拾取的时间越早。 |
+
+:::caution[架构警示]
+定时器事件的物理触发完全依赖于 ORION引擎的 Job Executor 的后台轮询机制（Polling）。在极高并发的 ORION 集群部署中，由于轮询间隔与数据库锁的开销，定时器可能会产生百毫秒级的物理延迟。**不可将其用于要求硬实时（Hard Real-time）触发的微秒级工业控制链路。**
+:::

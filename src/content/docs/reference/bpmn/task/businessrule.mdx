@@ -1,0 +1,91 @@
+---
+title: 业务规则任务
+description: BPMN 2.0 业务规则任务的底层定义、DMN 引擎集成、结果映射机制与多租户解析规范参考。
+---
+
+## 1. 描述 (Description)
+
+业务规则任务（Business Rule Task）用于同步执行一个或多个业务规则。
+
+在 ORION 平台中，除了原生集成 DMN 规则引擎外，业务规则任务的底层能力与服务任务（Service Task）高度对齐，支持调用 Java 委派代码、通过外部任务（External Task）异步执行或调用 Web Service。
+
+## 2. DMN 引擎集成 (DMN Engine Integration)
+
+当使用业务规则任务评估 DMN 决策时，必须通过核心属性进行精确绑定。
+
+### 2.1 核心引用属性
+* **决策引用 (`camunda:decisionRef`)**: 指定需要评估的决策键值 (Decision Key)。支持使用表达式在运行时动态求值。
+* **版本绑定 (`camunda:decisionRefBinding`)**: 指定引擎应评估该决策的哪个版本，默认值为 `latest`。支持以下有效值：
+    * `deployment`: 评估与当前流程版本同批次部署的决策版本。
+    * `latest`: 评估最新版本的决策。
+    * `version`: 配合 `camunda:decisionRefVersion` 属性，指定要执行的特定绝对版本号。
+    * `versionTag`: 配合 `camunda:decisionRefVersionTag` 属性，指定要执行的特定版本标签。
+
+## 3. 决策结果映射 (Decision Result Mapping)
+
+DMN 决策的执行过程是无状态的。决策结果默认不会自动保存为流程变量。必须配置结果变量与映射策略，引擎才会将底层输出持久化到流程上下文中。
+
+### 3.1 结果承载变量配置
+* **结果变量 (`camunda:resultVariable`)**: 定义决策执行完毕后，用于承载返回结果的流程变量名称。若未配置此属性，DMN 的输出将在节点执行完毕后直接丢弃。
+
+### 3.2 映射器类型 (Map Decision Result)
+映射器 (`camunda:mapDecisionResult`) 用于定义引擎如何将 DMN 表格的输出结构化并注入到结果变量中。Camunda 提供以下四种标准映射策略：
+
+1. **resultList (`List<Map<String, Object>>`)**
+   * **机制**: 默认选项。将整个决策结果表映射为一个 Java List。List 中的每个元素代表一条命中的规则（Map 结构，Key 为输出列名，Value 为对应值）。
+   * **适用场景**: 预期触发多条规则、返回多行结果的情况（对应 Hit Policy: Collect 或 Rule Order）。
+
+2. **singleResult (`Map<String, Object>`)**
+   * **机制**: 期望 DMN 仅有一条规则被命中，引擎直接将该行转化为单一 Map 结构。
+   * **约束**: 若运行时触发了多行结果，引擎将抛出异常。
+   * **适用场景**: 规则表有多个输出列，且确定只返回单行数据的情况（对应 Hit Policy: Unique, First, Any）。
+
+3. **singleEntry (`TypedValue`)**
+   * **机制**: 直接提取唯一命中行的唯一输出列的值，剥离所有 List 和 Map 外壳，将基础数据类型（如 String, Integer, Boolean）直接赋给结果变量。
+   * **约束**: 若结果返回了多行，或 DMN 定义了多个输出列，引擎将抛出异常。
+   * **适用场景**: 适用于单一指标输出，后续节点（如排他网关）可直接通过简单表达式（如 `${result == 'APPROVED'}`）进行评估。
+
+4. **collectEntries (`List<Object>`)**
+   * **机制**: 忽略 Map 的键值对结构，直接将多行结果中的某一输出列抽离，汇聚成一个扁平的值列表（List）。
+   * **约束**: 通常要求 DMN 决策表仅包含一个输出列；若有多个，默认仅收集第一列的值。
+   * **适用场景**: 适用于仅提取单一属性集合的场景，常用于为后续节点的多实例（Multi-instance）循环提供输入集合。
+
+### 3.3 映射策略选型指南
+针对预期输出结构与 DMN 命中策略 (Hit Policy)，推荐的映射配置如下：
+
+| 预期 DMN 输出结构 | 推荐映射器 (mapDecisionResult) | 典型命中策略 (Hit Policy) |
+| :--- | :--- | :--- |
+| **多行 + 多列** | `resultList` | Collect, Rule Order |
+| **单行 + 多列** | `singleResult` | Unique, First, Any |
+| **单行 + 单列** (单一具体值) | `singleEntry` | Unique, First |
+| **多行 + 单列** (单一属性集合) | `collectEntries` | Collect |
+
+### 3.4 变量命名约束
+在配置结果变量时，其名称**不能**定义为 `decisionResult`。引擎底层已将原始决策结果对象保存在该系统变量中，若强制使用同名变量会导致保存时抛出运行时异常。
+
+## 4. 多租户解析机制 (Tenant Resolution)
+
+在 SaaS 或多租户架构中，业务规则任务在解析决策定义时受以下机制控制：
+
+### 4.1 默认租户解析
+默认情况下，引擎使用**调用方流程定义（Process Definition）**的租户 ID 来寻找匹配的决策定义。
+* 若调用方流程定义无租户 ID，则寻找无租户 ID 的决策。
+* 若调用方有租户 ID，则寻找具有相同租户 ID 的决策。
+* 默认行为中，当前流程实例（Process Instance）的租户 ID 不被计入求值范围。
+
+### 4.2 显式租户解析
+通过 `camunda:decisionRefTenantId` 属性可以覆盖默认行为，强制指定目标租户 ID。支持硬编码字符串，或使用表达式（如 `${execution.tenantId}`）动态跟随当前流程实例的租户上下文。
+
+## 5. 替代实现方式 (Alternative Implementations)
+
+若业务场景不使用原生 DMN 引擎，可直接采用与服务任务一致的执行逻辑：
+* **Java 委派**: 通过 `camunda:class` 或 `camunda:delegateExpression` 接入自定义规则引擎或 Java 代码。
+* **外部任务 (External Task)**: 配置 `camunda:type="external"` 并结合 `camunda:topic`，将规则评估交由外部微服务异步处理。
+
+## 6. 属性依赖与约束 (Dependencies & Constraints)
+
+在底层 XML 配置中，业务规则任务必须遵守以下依赖关系：
+1. **必选属性**: 必须包含 `camunda:class`、`camunda:delegateExpression`、`camunda:decisionRef`、`camunda:type` 或 `camunda:expression` 中的任意一项。
+2. **结果变量依赖**: `camunda:resultVariable` 只能与 `camunda:decisionRef` 或 `camunda:expression` 组合使用。
+3. **排他执行**: `camunda:exclusive` 属性仅在 `camunda:asyncBefore` 或 `camunda:asyncAfter` 设为 `true` 时生效。
+4. **外部任务特有属性**: `camunda:topic` 与 `camunda:taskPriority` 仅在 `camunda:type="external"` 时可用。

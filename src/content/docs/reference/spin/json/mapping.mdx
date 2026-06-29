@@ -1,0 +1,81 @@
+---
+title: JSON 对象映射
+description: Camunda Spin 库通过集成 Jackson 实现 JSON 与 Java 对象之间序列化与反序列化的底层架构规范参考。
+---
+
+## 1. 描述 (Description)
+
+SPIN 通过集成 Jackson 映射库，提供了在 JSON 数据与 Java 对象之间进行双向转换的能力。它允许架构师将复杂的 JSON 报文直接映射为强类型 Java 对象（POJO），同时也支持将 Java 对象无缝序列化为标准的 JSON 格式。
+
+## 2. 对象模型映射 (Basic Mapping)
+
+假设定义了一个 `Customer` 实体类：
+
+```java
+public class Customer {
+  private String name;
+  public String getName() { return name; }
+  public void setName(String name) { this.name = name; }
+}
+
+```
+
+### 2.1 JSON 转 Java (Deserialization)
+
+使用 `mapTo()` 方法可以将 JSON 对象映射为 Java 实例。
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+// 将 JSON 对象映射为 Customer 类实例
+Customer customer = JSON("{\"name\": \"Kermit\"}").mapTo(Customer.class);
+
+```
+
+### 2.2 Java 转 JSON (Serialization)
+
+将 Java 对象转换回 JSON 字符串非常直接。
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+// 将 Java 对象转换回 JSON 字符串
+String json = JSON(customer).toString();
+
+```
+
+## 3. 原生类型与字符串处理约束 (Primitives & Strings)
+
+SPIN 支持将 Java 原生类型（如 boolean, number）映射为相应的 JSON 值。例如 `JSON(true)` 会映射为 JSON 常量 `true`。
+
+但需要注意字符串处理的特殊约束：
+
+* **禁止自动转换**: 简单的 String 值不会被自动转化为 JSON。
+* **无效 JSON 异常**: 直接传入 `JSON("a String")` 会抛出异常，因为 `"a String"` 缺少转义引号，不是合法的 JSON 格式。
+* **集合转换**: 包含 String 值的列表（List）会被正确转换为 JSON 数组。
+
+## 4. 泛型类型映射 (Generic Types)
+
+在处理集合类型（如 `List<Customer>`）时，由于 Java 泛型擦除机制，仅调用 `mapTo(ArrayList.class)` 无法识别数组内部元素的具体类型。
+
+此时，必须通过 Jackson 的规范提供一个完整的**规范类型字符串 (Canonical Type String)**：
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+String json = "[{\"name\": \"Kermit\"}, {\"name\": \"Hugo\"}]";
+
+// 使用完整的全限定名定义泛型集合类型
+List<Customer> customers = JSON(json).mapTo("java.util.ArrayList<com.example.Customer>");
+
+```
+
+## 5. 多态类型处理 (Polymorphic Types)
+
+将 JSON 映射为 Java 对象时，如果属性引用的是接口（Interface）或抽象类，Jackson 无法仅通过 `Customer` 类的静态结构推断出具体的实现类（例如 `Car` 接口有 `StationWagon` 或 `Van` 等多种实现）。
+
+### 5.1 架构方案
+
+* **类型信息嵌入**: Jackson 依赖 JSON 报文中显式包含的类型信息（Type Information）来完成多态反序列化。
+* **配置方式**: 需要参考 Jackson 官方文档，配置类型的序列化与反序列化策略。这些配置可以在 Spin 的环境配置部分进行统一设置，确保引擎在处理包含多态引用的 JSON 时能够正确实例化对应的子类。
+

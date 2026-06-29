@@ -1,0 +1,73 @@
+---
+title: 条件事件
+description: BPMN 2.0 条件事件的底层定义、变量求值触发机制、生命周期延迟与异步事务陷阱参考。
+---
+
+## 1. 描述 (Description)
+
+条件事件（Conditional Events）定义了一种在给定业务条件评估为 `true` 时被激活的触发机制。
+
+在 ORION 平台基于规则与资源流转的编排哲学中，条件事件是实现“数据驱动流程控制”的核心。与等待外部显式 API 调用的消息或信号事件不同，**条件事件完全由引擎内部的流程变量（Process Variables）变更所驱动**。
+
+
+## 2. 核心定义属性 (Core Condition Definitions)
+
+在属性面板中，条件设置（Condition）区域决定了引擎监听和评估的底层逻辑。它包含以下四个关键配置项：
+
+| 属性名称 (UI Label) | 对应 XML / 扩展 | 数据类型 | 事实描述与约束 |
+| :--- | :--- | :--- | :--- |
+| **变量名称 (Variable name)** | `camunda:variableName` | String | （性能优化扩展）指定引擎需要显式监听的特定流程变量。引擎仅在该变量发生变化时触发求值评估，从而避免极度消耗性能的全局扫描。对于可多次触发的非中断型事件特别有用。 |
+| **变量事件 (Variable events)** | `camunda:variableEvents` | String | （性能优化扩展）定义触发条件评估的变量生命周期事件（如 `create`, `update`, `delete`）。支持逗号分隔的多值配置。若留空，默认在变量发生**任何**修改时均触发评估。 |
+| **求值类型 (Type)** | `<condition xsi:type="...">` | 枚举 | 条件的定义方式。默认为 **Expression (表达式)**，针对复杂计算逻辑也可切换为 **Script (脚本)** 引擎求值。 |
+| **条件表达式 (Condition Expression)** | `<condition>` | JUEL / Script | **核心触发公式（必填）**。必须输入返回布尔值（`true` / `false`）的表达式（如 `${rowCount > 10}` 或 `${status == 'APPROVED'}`）。只有当计算结果为 `true` 时，流程才会离开该等待节点继续执行。 |
+
+
+## 3. 节点级应用行为与结构上下文 (Contextual Behaviors)
+
+引擎允许在以下结构上下文中使用条件事件：
+
+### 3.1 顶级条件开始事件 (Top-level Conditional Start Event)
+用于通过评估条件来直接实例化一个全新的流程。
+* **唯一性强约束**：在同一个流程定义中，每个条件开始事件的表达式**必须是唯一的**。如果包含两个相同的条件，引擎在部署时将直接抛出异常。
+* **版本迭代契约**：部署新版本流程时，旧版本的条件订阅将被自动取消。
+* **API 触发模式**：无法通过普通的启动接口调用，必须使用运行时服务的条件评估 API（如 `evaluateStartConditions`）进行触发，并传入用于求值的全局变量。
+
+### 3.2 事件子流程条件开始事件 (Event Sub-process Start Event)
+作为事件子流程的唯一启动入口。支持**中断型**与**非中断型**。
+
+### 3.3 条件中间捕获事件 (Conditional Intermediate Catch Event)
+充当执行流的显式等待状态。执行流到达此节点后将挂起，首次进行条件评估。若为 `false`，则持续等待直至条件满足。
+
+### 3.4 条件边界事件 (Conditional Boundary Event)
+依附于活动的边界，充当观察者。
+* **中断型 (Interrupting)**：条件满足时，中断当前活动。
+* **非中断型 (Non-interrupting)**：原活动保持活跃，引擎创建一条额外的并行执行流。只要原活动处于活跃状态，非中断事件**可以被多次触发**。
+
+
+## 4. 底层求值与触发机制 (Evaluation & Triggering Mechanics)
+
+在 ORION 引擎底层，条件的求值评估遵循极其严密的物理生命周期法则：
+
+### 4.1 作用域实例化触发 (Triggering on Scope Instantiation)
+当一个 BPMN 作用域（如流程本身或子流程）被实例化时，该作用域内的所有条件事件会**立即进行评估**。如果条件满足，条件事件会立刻触发，甚至**优先于默认的空开始事件 (None Start Event)** 执行。
+
+### 4.2 API 与委托代码的延迟差异 (API vs. Delegation Code)
+* **外部 API 触发**：通过 REST/Java API 从外部更新变量时，引擎会**立即触发**适用条件事件的评估。
+* **委托代码延迟机制**：通过内部的 Java Delegate、执行监听器 (Execution Listener) 或脚本更新变量时，为了不干扰当前正在执行的代码逻辑，条件**不会立即触发**。引擎会记录这些变更，并在当前活动实例生命周期阶段（如 Starting, Execute, Ending）**结束时**，进行集中分发和评估。
+
+### 4.3 评估方向与可见性 (Top-Down & Scoped Evaluation)
+* **自顶向下 (Top-Down)**：变量变更导致的求值，会从变量发生改变的作用域开始，**逐层向下**深入到所有嵌套的子流程实例中进行评估。
+* **作用域隔离 (Scoped Evaluation)**：变量变更**绝对不会**触发对其不可见（如跨越并行分支或平行子流程）的条件事件。
+
+## 5. 异步延续注意事项 (Asynchronous Continuation Trap)
+
+在使用条件事件时，涉及底层数据库事务边界的配置存在一个极具破坏性的陷阱。
+
+:::danger[条件触发器丢失风险 (Loss of Conditional Event Trigger)]
+**强烈建议：绝对避免在触发条件事件的流节点上组合使用异步延续（`Async Before` / `Async After`）。**
+
+**底层物理原因：**
+1. 当某个条件事件被触发时，引擎会将其放入一个**“延迟动作队列 (Queue of Deferred Actions)”**中，以评估是否有其他元素正在捕获该触发器。
+2. 如果触发该条件的流节点配置了异步执行 (Async)，当前引擎线程会创建一个后台 Job，并将流程的执行转为异步延续。
+3. **灾难点**：ORION 引擎内存中的“延迟动作”是**不持久化的 (Not persisted)**。一旦事务截断转为异步，未持久化的触发指令将直接消失，导致**条件事件的触发彻底丢失**。
+:::

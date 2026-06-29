@@ -1,0 +1,45 @@
+---
+title: 发送任务
+description: BPMN 2.0 发送任务的底层定义、与服务任务的物理一致性以及扩展属性约束参考。
+---
+
+## 1. 描述 (Description)
+
+发送任务（Send Task）是一个专门用于向外部系统、参与者或另一个流程发送消息的活动节点。在视觉上，它带有一个深色的信封图标。
+
+在 ORION 平台底层的执行态中，**发送任务的物理行为与服务任务（Service Task）完全一致**。它之所以独立存在，主要是为了在 BPMN 2.0 业务语义层面上，明确向业务架构师和分析师传达“此处发生了一次消息出站（Outbound Message）”的业务动作。
+
+## 2. 执行机制与底层对齐 (Execution Mechanism)
+
+由于其底层与服务任务共享相同的执行逻辑，架构师可以通过相同的策略来实现消息的发送逻辑：
+
+* **引擎内同步发送**: 通过配置 `camunda:class` 或 `camunda:delegateExpression`，调用底层的 Java 委派代码或 Spring Bean 来同步发送消息（如调用内部的邮件服务或 Kafka 生产者）。
+* **表达式与结果映射**: 通过 `camunda:expression` 执行特定的方法调用，并可将执行结果存入流程变量。
+* **连接器 (Connector)**: 通过 `<camunda:connector>` 扩展元素，直接发起 HTTP 或 SOAP 请求进行消息推送。
+
+## 3. 跨系统解耦：外部任务发送 (External Tasks)
+
+在现代微服务架构中，强烈建议将发送任务配置为外部任务（External Task），以实现消息推送与核心流程引擎的物理脱钩。
+
+* **配置方式**: 将属性面板的 Implementation 设置为 `External`（底层生成 `camunda:type="external"`），并指定一个订阅主题（`camunda:topic`）。
+* **执行行为**: 引擎执行到此节点时会挂起，并将发送请求作为工作项放入队列。外部的消息网关或通知微服务将轮询获取该任务，并在实际完成短信或邮件发送后，回调引擎完成该节点。
+
+## 4. 引擎级扩展属性与依赖约束 (Engine Extensions & Constraints)
+
+发送任务支持与服务任务完全相同的扩展属性，并严格遵循相同的 XML 配置依赖关系。
+
+### 4.1 必选策略约束 (Mandatory Selection)
+一个合法的发送任务，**必须且只能**包含以下四个执行属性中的一个：
+* `camunda:class`
+* `camunda:delegateExpression`
+* `camunda:type`
+* `camunda:expression`
+
+### 4.2 属性依赖约束 (Attribute Dependencies)
+
+| 扩展属性 | 依赖条件 | 事实描述 |
+| :--- | :--- | :--- |
+| `camunda:resultVariable` | 仅在使用 `camunda:expression` 时有效。 | 用于将表达式的执行结果（如 Message ID）回写到流程变量中。 |
+| `camunda:topic` | 仅在 `camunda:type="external"` 时可用。 | 用于定义外部工作节点订阅该发送任务的通道。 |
+| `camunda:taskPriority` | 仅在 `camunda:type="external"` 时可用。 | 决定该发送任务在轮询队列中的优先级权重。 |
+| `camunda:exclusive` | 仅在 `camunda:asyncBefore` 或 `camunda:asyncAfter` 为 `true` 时生效。 | 确保同一流程实例的异步任务不被交叉并发拾取。 |

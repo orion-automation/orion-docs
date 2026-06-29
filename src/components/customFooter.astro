@@ -1,0 +1,24 @@
+---
+import type { Props } from '@astrojs/starlight/props';
+import Default from '@astrojs/starlight/components/Footer.astro';
+---
+
+{/* 保留原生的上一页/下一页和更新时间（若不需要，可直接删掉这一行） */}
+<Default {...Astro.props} />
+
+<div class="custom-copyright">
+  <p>© {new Date().getFullYear()} <strong>ORION</strong>. All rights reserved. | Powered by ORI Stellar<sup> ai</sup></p>
+</div>
+
+<style>
+  .custom-copyright {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--sl-color-gray-5);
+    text-align: center;
+  }
+  .custom-copyright p {
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-4);
+  }
+</style>

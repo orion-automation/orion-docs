@@ -1,0 +1,62 @@
+---
+title: 接收任务
+description: BPMN 2.0 接收任务的底层定义、消息触发规范、多实例限制以及与消息捕获事件的架构选型对比参考。
+---
+
+## 1. 描述 (Description)
+
+接收任务（Receive Task）是一个显式的等待状态（Wait State）活动节点，专门用于等待特定消息的到达。
+
+在 ORION 平台底层的执行态中，当执行流到达接收任务时，引擎会立即将当前的流程状态提交并持久化到底层存储中。流程实例将在此节点被挂起，直到引擎接收到特定的触发指令，流程才会越过该节点继续向下推进。这是协调跨系统规则验证、等待外部资源分配或异步回调的标准组件。
+
+## 2. 消息引用与触发机制 (Message Reference & Triggering)
+
+接收任务在底层存在两种不同的配置与触发机制，取决于是否为其绑定了具体的消息定义。
+
+### 2.1 绑定消息引用 (With Message Reference)
+如果在模型中为接收任务配置了特定的消息引用（`messageRef`），引擎在执行流到达该节点时，会在底层数据库中创建一条事件订阅 (Event Subscription) 记录。支持以下两种触发方式：
+* **消息关联触发**：外部系统可以通过底层 Java API（如 `runtimeService.createMessageCorrelation`）或 REST API，利用业务键（Business Key）或流程变量，精确匹配并触发该订阅。
+* **显式订阅触发**：通过底层 API 查询出具体的 `EventSubscription` 对象，然后调用 `messageEventReceived` 方法显式触发。
+
+### 2.2 无消息引用 (Without Message Reference)
+如果不配置消息引用，接收任务将作为一个纯粹的等待节点存在，底层不会生成消息事件订阅。
+* **强制唤醒机制 (Java API 触发)**：必须通过底层 API 查询出当前停留在该节点的具体执行流实例（Execution ID）。随后，直接调用底层 Java API 的 `runtimeService.signal(executionId)` 方法强行唤醒并推进流程。
+
+:::caution[备注：API 命名歧义]
+此处的 `signal()` 仅为 ORION (Camunda 7) 核心引擎底层用于推进通用等待状态的 Java 方法名，它与 BPMN 2.0 规范中的全局“信号事件 (Signal Event)”没有任何物理或语义上的关联。
+:::
+
+## 3. 架构选型：接收任务 vs. 中间消息捕获事件 (Receive Task vs. Message Catch Event)
+
+在 BPMN 2.0 模型中，接收任务与中间消息捕获事件在底层都依赖引擎的事件订阅机制进行唤醒。在架构选型时，需要基于以下差异进行决策：
+
+### 3.1 异常与超时支持 (Boundary Event Support)
+* **接收任务 (Receive Task)**：作为一种活动（Activity），它**允许附加边界事件 (Boundary Events)**。如果业务场景要求在等待外部回调时设置 SLA 超时时间，可以在接收任务上挂载一个边界定时器事件，以便在超时后引导流程进入异常处理链路。
+* **消息捕获事件 (Catch Event)**：作为一种事件节点，它**不允许**挂载任何边界事件。如果流程在此处无期限挂起，将无法在节点级别直接实现超时阻断。
+
+### 3.2 业务语义表达 (Semantic Expression)
+* **接收任务**：强调这是一个具体的业务工作步骤，意味着企业业务运行的参与者正在主动等待某项前置资源或契约的完成。
+* **消息捕获事件**：侧重于描述流程状态机中的一个被动状态变化，表示流程在此处响应了一个事实发生的事件。
+
+### 3.3 选型准则 (Selection Guidelines)
+* 当等待行为需要配合超时阻断、重试或补偿机制时，推荐使用接收任务。
+* 当需要使用无类型等待（不定义具体消息，仅依赖引擎底层 Execution ID 唤醒）时，只能使用接收任务。
+* 当仅作为流程中的轻量级状态同步，且无需处理复杂的局部异常时，推荐使用中间消息捕获事件。
+
+## 4. 并发多实例架构约束 (Parallel Multi-Instance Constraint)
+
+在使用接收任务处理并发业务逻辑时，存在一项严格的物理限制：无法通过消息关联直接触发并行的多实例接收任务。
+
+如果一个带有消息引用的接收任务被配置为并行多实例，引擎会瞬间创建多个并行的执行流，它们共享相同的流程上下文与业务键。当外部系统尝试进行消息关联时，底层无法明确识别该消息属于哪一个具体的并行事件订阅，从而导致关联失败。在此场景下，必须通过提取对应的 `executionId` 来逐一显式唤醒。
+
+## 5. 引擎级扩展属性与依赖约束 (Engine Extensions & Constraints)
+
+接收任务支持以下底层扩展属性：
+
+| 属性名称 (UI Label) | 对应 XML 扩展 | 约束与事实描述 |
+| :--- | :--- | :--- |
+| **异步边界 (Async)** | `camunda:asyncBefore` / `camunda:asyncAfter` | 强制切断数据库事务边界。 |
+| **独占排他 (Exclusive)** | `camunda:exclusive` | 仅在 `camunda:asyncBefore` 或 `camunda:asyncAfter` 为 `true` 时生效。确保同一流程实例的异步任务不被并发交叉拾取。 |
+| **任务优先级** | `camunda:jobPriority` | 决定其在异步队列中的执行权重。 |
+| **重试策略** | `camunda:failedJobRetryTimeCycle` | 设定异步执行失败时的重试间隔与次数。 |
+| **输入输出映射 (I/O)**| `camunda:inputOutput` | 用于在任务等待前后对局部流程变量进行隔离与映射。 |

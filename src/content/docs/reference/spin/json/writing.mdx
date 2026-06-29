@@ -1,0 +1,50 @@
+---
+title: 写入与序列化 JSON
+description: Camunda Spin 库将 JSON 节点对象序列化为标准字符串或直接写入字符流的底层 API 规范参考。
+---
+
+## 1. 描述 (Description)
+
+在操作完 JSON 数据树之后，Spin 库提供了将底层的 `SpinJsonNode` 对象重新序列化为标准 JSON 格式的机制。
+
+在底层的执行态中，Spin JSON 数据类型原生支持将对象状态输出为字符串（Strings）或直接写入字符流（Writers）。这是将处理完毕的业务变量结构化输出、供外部系统消费或进行物理持久化的最终步骤。
+
+## 2. 输出为字符串 (Writing to a String)
+
+这是最直接的序列化方法。通过调用 `SpinJsonNode` 对象的 `.toString()` 方法，可以获取该节点及其所有嵌套子节点的标准 JSON 字符串表示。
+
+### 2.1 序列化示例
+在 Java 环境中，可以无缝地将操作后的节点转换为字符串：
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+// 初始化或操作 JSON 节点
+SpinJsonNode jsonNode = JSON("{\"customer\": \"Kermit\"}");
+
+// 将节点序列化为标准字符串
+String jsonString = jsonNode.toString();
+
+```
+
+## 3. 写入字符流 (Writing to a Writer)
+
+对于需要将业务 JSON 数据直接输出到文件、网络响应或其他底层 I/O 通道的场景，直接将数据写入 `java.io.Writer` 是标准的工程实践。
+
+* **API 调用机制**: 使用 `.writeToWriter(Writer writer)` 方法。引擎会将 JSON 序列化内容直接推送到指定的 Writer 实例中，并返回该 Writer 实例本身以便于后续操作。
+
+### 3.1 字符流写入示例
+
+以下示例展示了如何将 JSON 节点的数据直接写入一个 `StringWriter`（在实际应用中，也可替换为 `FileWriter` 或 `PrintWriter` 等其他 I/O 实现）：
+
+```java
+import static org.camunda.spin.Spin.JSON;
+import java.io.StringWriter;
+
+// 初始化或操作 JSON 节点
+SpinJsonNode jsonNode = JSON("{\"customer\": \"Kermit\"}");
+
+// 将节点数据推送到指定的 Writer 实例中
+StringWriter writer = jsonNode.writeToWriter(new StringWriter());
+
+```

@@ -1,0 +1,63 @@
+---
+title: 条件顺序流与默认流
+description: BPMN 2.0 顺序流的底层路由机制、条件表达式与脚本求值规范以及默认流配置参考。
+---
+
+## 1. 描述 (Description)
+
+顺序流（Sequence Flow）是连接流程中两个物理元素的标准连接器。
+
+在 ORION 平台中，当顺序流连接在网关（Gateways）或标准活动（Activities）之后时，它们不再仅仅是静态的连线，而是承载着流程执行状态机进行“下一步去哪”的**核心求值评估器**。
+
+## 2. 底层并行机制与网关特例 (Evaluation Mechanics)
+
+理解顺序流的评估逻辑，必须区分其依附的节点类型：
+
+* **默认活动并行 (Default Activity Behavior)**：当执行流离开一个标准的 BPMN 2.0 活动（如普通任务）时，引擎的默认行为是评估所有输出连线上的条件。如果多个连线的条件评估为 `true`，引擎将生成多个平行的执行流（Token），使流程以并行方式继续推进。这就构成了 BPMN 2.0 默认的并行本质。
+* **网关专属接管 (Gateway Override)**：当顺序流依附于网关时，网关组件会接管并改变上述的默认机制。例如，排他网关（Exclusive Gateway）会强行阻断并行机制，即使有多条连线评估为 `true`，也仅允许第一条命中的顺序流放行。
+
+
+## 3. 条件顺序流属性定义 (Conditional Sequence Flow Properties)
+
+条件顺序流在 XML 层级被表示为包含 `<conditionExpression>` 子元素的常规连线。在 ORION 属性面板中，必须为其明确指定求值引擎类型并配置精确的逻辑。
+
+| 属性名称 (UI Label) | 对应 XML / 扩展 | 数据类型 | 事实描述与约束 |
+| :--- | :--- | :--- | :--- |
+| **条件类型 (Condition Type)** | `xsi:type` | 枚举 | 决定底层求值引擎。支持在 **Expression (表达式)** 与 **Script (脚本)** 之间切换。 |
+| **条件内容 (Condition)** | `<conditionExpression>` | String | **核心强制约束**：无论使用表达式还是脚本，最终的解析或执行结果**必须返回布尔值 (boolean)**，否则引擎在评估时将直接抛出异常。 |
+| **脚本格式 (Script Format)** | `language` | String | （仅当 Type 切换为 Script 时必填）指定脚本引擎语言，例如 `groovy`, `javascript` 等。 |
+| **外部资源引用 (Resource)** | `camunda:resource` | String | （仅当 Type 切换为 Script 时显示）当脚本代码极大时，支持引入外部部署的脚本资源文件路径进行求值。 |
+
+### 3.1 表达式与脚本编写范式 (Expression vs. Script Paradigms)
+
+根据在面板中选择的“条件类型”，底层机制与编写规范有着严格的界限：
+
+* **Expression (表达式模式)**：
+    系统默认模式。底层使用 UEL (Unified Expression Language) 引擎。适用于简短、高性能的单行数据判断。
+    * *属性直接读取*: `${order.price > 100 && order.price < 250}`
+    * *内部方法调用*: `${order.isStandardOrder()}`
+
+* **Script (脚本模式)**：
+    适用于需要多行逻辑、复杂变量运算或数据类型转换才能得出最终布尔结果的复杂场景。面板中需配套填写 Script Format。
+    * *Groovy 脚本示例*:
+      ```groovy
+      def threshold = 1000;
+      def currentAmount = order.getAmount();
+      // 必须确保最后一行的执行结果为 true 或 false
+      return currentAmount > threshold; 
+      ```
+
+
+## 4. 默认顺序流属性定义 (Default Sequence Flow Properties)
+
+所有的 BPMN 2.0 任务和网关都支持配置一条默认顺序流。
+
+* **绝对优先级垫底**：默认流的唯一作用是兜底。**只有在所有其他附带条件的顺序流都未能被选中时，它才会被引擎选为输出路径**。
+* **条件屏蔽原则**：如果对一条标记为“默认”的顺序流强行配置了条件类型与内容，引擎在运行时会**永远忽略该条件**。
+* **物理标识**：
+    * **视觉规范**：在画布上，默认顺序流的起始端会带有显式的斜线（slash）标记。
+    * **XML 绑定**：默认流的 ID 不是配置在连线自身上的，而是通过网关/活动节点上的 `default` 属性进行强制绑定（如 `<exclusiveGateway id="exclusiveGw" default="flow4" />`）。
+
+:::caution[排他网关异常兜底]
+在处理动态业务数据时（例如外部 API 返回了预料之外的状态码），如果未命中任何分支条件，且网关**没有配置默认流**，引擎将抛出无法路由的异常。强烈建议在涉及复杂数据流转的排他网关后，永远保留一条无条件（或条件被忽略）的默认流，指向异常人工处理节点。
+:::
