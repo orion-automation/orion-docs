@@ -9,7 +9,7 @@ editUrl: false
 <script 
   id="api-reference" 
   data-url="/openapi_cn.json"
-  data-configuration='{"theme": "default", "showSidebar": true, "localization": {"locale": "zh-CN"}}'
+  data-configuration='{"theme": "default", "agent": { "disabled": true },"showSidebar": true, "localization": {"locale": "zh-CN"}}'
 ></script>
 
 {/* 引入本地化的 Scalar 核心库 */}
@@ -21,4 +21,18 @@ editUrl: false
   .content-panel { padding: 0 !important; }
   .sl-container { max-width: 100% !important; margin: 0 !important; }
   h1#_top { display: none; }
+`}</style>
+
+{/* 样式微调，解决 MDX 编译报错，并隐藏不必要的 UI */}
+<style>{`
+  :root { --theme-color-1: var(--sl-color-accent); }
+  .content-panel { padding: 0 !important; }
+  .sl-container { max-width: 100% !important; margin: 0 !important; }
+  h1#_top { display: none; }
+  
+  /* 隐藏底部 Scalar 官方版权水印与引流链接 */
+  .scalar-app a[href*="scalar.com"],
+  .scalar-card-footer a[href*="scalar.com"] { 
+    display: none !important; 
+  }
 `}</style>

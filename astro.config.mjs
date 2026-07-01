@@ -36,6 +36,16 @@ export default defineConfig({
                 { icon: 'github', label: 'GitHub', href: 'https://github.com/orion-automation' }],
             sidebar: [
                 {
+                    label: '快速开始',
+                    translations: {
+                        root: '快速开始',
+                        ja: 'クイックスタート',
+                        en: 'Quick Start'
+                    },
+                    collapsed: true,
+                    items: [{ autogenerate: { directory: 'guides' } }],
+                },
+                {
                     label: '操作指南',
                     translations: {
                         root: '操作指南',
@@ -43,7 +53,19 @@ export default defineConfig({
                         ja: '操作ガイド'
                     },
                     collapsed: true,
-                    items: [{ autogenerate: { directory: 'howto' } }],
+                    items: [
+                        {
+                            label: '设计中心',
+                            translations: {
+                                root: '设计中心',
+                                en: 'Design Center',
+                                ja: '設計センター'
+                            },
+                            collapsed: true,
+                            // 在这里自动生成 bpmn 文件夹下的内容
+                            items: [{ autogenerate: { directory: 'howto/design', collapsed: true } }]
+                        },
+                    ],
                 },
                 {
                     label: '技术参考',
@@ -61,7 +83,11 @@ export default defineConfig({
                                 en: 'REST API Reference',
                                 ja: 'REST API リファレンス'
                             },
-                            slug: 'reference/api' // 指向 src/content/docs/reference/api.mdx
+                            slug: 'reference/api',
+                            attrs: {
+                                target: '_blank',
+                                rel: 'noopener noreferrer' // 安全最佳实践，防止新窗口获取原窗口的引用
+                            } // 指向 src/content/docs/reference/api.mdx
                         },
                         // 2. 手动定义 bpmn 目录，并为其配置多语言
                         {

@@ -1,0 +1,124 @@
+---
+title: "快速部署"
+description: "通过Docker Compose快速部署体验ORION EE企业版"
+---
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+本指南介绍如何使用 Docker 安装和运行 ORION EE 企业版（基于Camunda 7.22核心引擎）。
+
+### **前提条件**
+
+> 安装 ORION EE企业版之前, 请确保你的机器已满足最低安装要求：
+>
+> - CPU \>= 2 核
+> - RAM \>= 4 GB
+> - 磁盘空间 \>= 10 GB（视日志保留策略）
+
+### 加载镜像
+
+<Steps>
+1. **准备资源** 通过官网渠道获取最新版本的 `eorion-camunda-ee` 镜像压缩文件。压缩文件为 `.tar` 格式，仅支持 Docker 引擎。
+
+1. **加载镜像** 将镜像加载至本地 Docker 环境：
+   ```bash
+   docker load -i eorion-camunda-ee-x.y.z.tar
+   ```
+2. **验证结果** 验证镜像是否加载成功，并查看镜像名称与标签（tag）：
+   ```bash
+   docker image ls
+   ```
+
+</Steps>
+
+### 配置与启动服务
+
+请参考项目中的 compose.yml 文件，调整必要的环境变量，并使用 Docker Compose 启动服务。
+
+```yaml
+services:
+  eorion:
+    image: <image-name>
+    container_name: eorion-camunda
+    ports:
+      - 8080:8080
+    restart: always
+    environment:
+      - EORION_CONFIG_NOCODB_URL=<nocodb 的完整 URL，如需连接>
+      - EORION_CONFIG_NOCODB_TOKEN=<nocodb 的访问令牌，如需连接>
+      - EORION_CONFIG_METABASE_URL=<metabase 的完整 URL，如需连接>
+      - EORION_CONFIG_META=<达芬奇AI功能及Dify的配置，如需连接>
+      - SPRING_DATASOURCE_URL=<数据库 JDBC 完整地址>
+      - SPRING_DATASOURCE_USERNAME=<数据库用户名>
+      - SPRING_DATASOURCE_PASSWORD=<数据库密码>
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=<JDBC 驱动的完整类名>
+```
+
+> - 请根据实际部署环境，替换上述 \<...\> 占位符内容。
+> - 数据库推荐：H2（内嵌，仅测试用）、PostgreSQL、MySQL
+
+### 启动服务
+
+在配置完成后，使用以下命令启动服务：
+
+```bash
+docker-compose -f compose.yml up -d
+```
+
+服务启动成功后，即可通过浏览器访问 http://localhost:8080 使用 ORION EE企业版。
+
+### 关于附加组件能力的配置
+
+compose文件中以下配置项目依赖于nocoDB，Metabase和Dify的安装部署。如果你需要使用它们的能力，则需要在安装 ORION 之前完成它们的安装及必要配置。
+
+```yaml
+environment:
+      - EORION_CONFIG_NOCODB_URL=<nocodb 的完整 URL，如需连接>
+      - EORION_CONFIG_NOCODB_TOKEN=<nocodb 的访问令牌，如需连接>
+      - EORION_CONFIG_METABASE_URL=<metabase 的完整 URL，如需连接>
+      - EORION_CONFIG_META=<达芬奇AI功能及Dify的配置，如需连接>
+```
+
+**关于NocoDB**
+
+NocoDB 在 ORION 平台中承担着低代码数据建模与数据服务自动化的关键角色。
+
+其主要功能是为 ORION 提供一个可视化的数据表建模环境，并**自动生成对应的数据操作 REST API**，从而让开发者和技术工程师能够快速构建、管理和调用业务数据对象。
+
+你可以在[这里](https://nocodb.com/docs/self-hosting/installation/docker-compose)查看最新的NocoDB的快速安装指南。安装完成后，记录 NocoDB 服务的完整访问地址（URL），并在 NocoDB 中生成一个[**API Token**](https://nocodb.com/docs/product-docs/account-settings/api-tokens)，将其填入 ORION 的安装配置参数，以便系统完成连接。
+
+**关于Metabase**
+
+Metabase 在 ORION 平台中承担可视化数据分析的核心功能。
+
+它不仅可以分析 ORION 平台内部的数据，还能连接并分析外部业务数据库的数据，帮助用户快速构建灵活、直观的可视化报表和商业智能（BI）分析能力。你可以在[这里](https://www.metabase.com/docs/latest/installation-and-operation/running-metabase-on-docker#open-source-quick-start)查看最新的Metabase的快速安装指南。安装完成后，记录 Metabase 服务的完整访问地址（URL）。
+
+**关于Dify**
+
+Dify 在 ORION 平台中承担智能对话与 AI 任务编排的功能。
+
+它支持通过可视化方式构建基于LLM的对话流或工作流（Chatflow或Workflow），并结合 RAG（Retrieval-Augmented Generation）机制，从知识库中检索企业专属信息，实现上下文增强的智能应答。
+
+EORION_CONFIG_META的配置样例如下：
+```json
+{
+  "smartAgent": {
+    "url": "对应Dify应用的url",
+    "chatToken": {
+      "form": "达芬奇交互表单AI助理的API token",
+      "bpmn": "达芬奇业务流程AI助理的API token",
+      "data": "达芬奇数据对象AI助理的API token",
+      "bpmnElement": "达芬奇流程节点生成AI助理的API token",
+      "project": "项目AI需求设计的API token",
+      "script": "脚本编辑AI助理的API token"
+    },
+    "generateToken": {
+      "form": "AI助理-生成表单的API token",
+      "data": "AI助理-生成数据对象的API token"
+    },
+    "analyticsBpmnToken": "流程挖掘分析AI助理的API token"
+  }
+}
+```
+
+
+同时，Dify 还可作为 ORION 智能体（Agent）框架的核心组件，为业务流程提供自然语言交互、意图识别及任务自动化处理能力。你可以在[这里](https://docs.dify.ai/zh-hans/getting-started/install-self-hosted/docker-compose)查看最新的Dify的快速安装指南。安装完成后，记录 Dify 服务的完整访问地址（URL）。
