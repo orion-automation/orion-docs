@@ -1,0 +1,116 @@
+---
+title: Reference编写规范
+description: 基于 Diátaxis 架构的 ORION 操作系统 Reference 技术文档编写指南与 AI 辅助工具。
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Reference（参考手册）是 ORION 操作系统技术文档体系中最严谨、最客观的基石。在企业级业务编排（Business Orchestration）与 Agentic Automation 的语境下，系统行为具有极强的确定性（由合同、规则、资源驱动）。因此，我们的 Reference 文档必须像一份极其严谨的“机器零件图纸”或“食品营养成分表”，容不下任何模糊的描述或营销词汇。
+
+这份规范旨在指导你如何编写符合 ORION 极简、功能主义美学的参考手册。
+
+## 一、 核心定位与隐喻
+
+Reference 提供的是用户在日常工作中随时需要查阅的**命题性或理论性知识（truth and certainty）**。
+
+* **地图（A Map）：** 参考手册就像一张地图。地图只客观描述地形（哪里有山、哪里有河），绝不教你“如何生火”或“应该走哪条路”。
+* **食品成分表（Nutritional Information）：** 当你看食品成分表时，你期望看到的是“净重 1000g”、“可能含有微量小麦”。你绝对不希望看到“厨师的烹饪感悟”——在技术文档中，那不仅多余，甚至危险。
+
+**目标受众状态：** 带着明确的问题而来，找到答案（如 API 参数、BPMN 扩展属性的 Key）后立刻离开。
+
+## 二、 ORION 核心编写原则
+
+### 1. 纯粹描述，绝不解释
+保持绝对的中立、客观、事实导向。写作中最难的就是“纯粹描述”，请无情剥离多余动作：
+* **禁止教学：** 不教用户怎么做，也不解释为什么这么设计。
+* **禁止废话：** 遇到想解释原理的冲动，请直接放置指向 How-to（操作指南）或 Explanation（概念解析）的链接。
+* **禁止宏大叙事：** 保持谦逊、务实的工程师底色，禁止使用任何过度包装的营销词汇。
+
+### 2. 尊重机器底层的物理结构
+文档的层级目录应当直接映射 ORION 操作系统或 Camunda 7 引擎的物理与逻辑结构。顺着代码和架构的逻辑，就是阅读文档的逻辑。
+
+### 3. 标准化语言模式
+使用陈述事实、列举清单和发出警告的标准化语言模式。
+
+| 语言模式 | 适用场景 | 示例 |
+| :--- | :--- | :--- |
+| **陈述事实** | 描述系统默认行为或路径 | ORION Agent 的默认超时配置继承自 Camunda Job Executor。 |
+| **列举清单** | 罗列参数、错误码、标志位 | 有效负载 (Payload) 包含以下字段：`agent_id` (String, 必填)。 |
+| **严格警告** | 边界条件、限制或危险操作 | 必须使用 HTTPS。除非已通过契约校验，否则绝不可覆盖此参数。 |
+
+
+
+## 三、 AI 辅助创作工作流 (Prompts)
+
+为了快速生成标准化的 Reference 文档并完美适配 Starlight 框架，请使用以下两套由架构师精心调优的 AI 提示词。
+
+<Tabs>
+  <TabItem label="步骤 1：生成内容 (Markdown)">
+    使用此 Prompt 让 AI 根据你提供的零散信息，生成符合 Diátaxis 规范的纯 Markdown 内容。
+    
+    ```markdown
+    # Role
+    你是一位世界级、极其严谨的技术文档专家，精通 Diátaxis 现代技术文档架构组织法中的 "Reference"（参考手册）核心方法论。同时，你对专注于企业级业务编排（Business Orchestration）与 Agentic Automation、核心底层基于 Camunda 7 的下一代操作系统（OS）ORION 有着深刻的架构级理解。
+
+    # Task
+    请严格基于 Diátaxis 的 "Reference" 哲学，为 ORION 系统的某一具体机器组件、API 接口、BPMN 扩展属性或配置清单，编写一份面向高级开发者和架构师的参考手册。
+
+    # Product Rules (ORION Core Context)
+    1. 定位：ORION 是企业级操作系统，绝不仅仅是简单的 LLM 任务流。
+    2. 引擎：核心引擎基于 Camunda 7，严格向下兼容 BPMN 2.0 规范，具备极强的系统确定性。
+    3. 语调基调：保持极度谦逊、技术化和务实。绝对禁止使用任何宏大叙事或过度营销的词汇。
+
+    # Documentation Constraints (Diátaxis "Reference" Specification)
+    1. 【纯粹描述】保持绝对客观、中立、克制。这不是教程，也不是指南。禁止出现“如何配置...”等引导句式。
+    2. 【零解释】只陈述事实（它是什么、包含哪些参数、默认值是什么、边界在哪里）。
+    3. 【结构映射】文档的层级必须严格映射代码、API 路径或对象模型的物理/逻辑结构。
+    4. 【标准语言范式】
+       - 采用字典式的陈述句：“X 是 Y。”、“默认值为 Z。”
+       - 大量使用表格、列表来展示参数、必填项和边界限制。
+       - 使用强硬的系统级约束语：“必须 (Must)”、“绝不 (Never)”、“不支持 (Not supported)”。
+    5. 【极简示例】如果提供代码示例，只提供代码本身，不附加任何教学式旁白。
+
+    # Input Information
+    - 参考对象/目标：[在这里输入目标，例如：ORION Agent 注册 API]
+    - 核心结构信息：[在这里输入核心字段或结构]
+    - 边界与限制：[在这里输入默认值、超时限制等]
+
+    # Output Format
+    严格按照以下结构输出，呈现冷峻、严谨的技术字典风格，禁止前言和废话：
+    ## [参考对象名称]
+    ### 1. 描述 (Description)
+    ### 2. 规范 (Specification)
+    ### 3. 参数清单 (Properties) (用表格)
+    ### 4. 行为与约束 (Behaviors & Constraints) (用列表)
+    ### 5. 示例 (Example)
+    ```
+  </TabItem>
+  
+  <TabItem label="步骤 2：转换为 Starlight MDX">
+    将上一步生成的 Markdown 内容连同此 Prompt 一起发送给 AI，将其转换为带有 Starlight 原生组件的 MDX 格式。
+
+    ```markdown
+    # Role
+    你是一位精通现代前端文档工程体系的技术文档专家，特别精通 Astro Starlight 框架。你擅长将标准 Markdown 内容转化为结构化、带有 Starlight 原生组件交互的 MDX 格式，同时保持代码的极简主义和功能美学，完全契合 ORION 操作系统的硬核、务实基调。
+
+    # Task
+    我将提供一份基于 Diátaxis "Reference" 标准编写的 ORION 系统技术文档。请将其转换为完全适配 Astro Starlight 的 `.mdx` 文件。
+
+    # Starlight MDX Component Rules
+    1. **Frontmatter:** 在文件顶部自动生成 YAML frontmatter，包含 title 和不超过 100 字的 description。
+    2. **Imports:** 在 Frontmatter 之后第一行显式导入组件：`import { Tabs, TabItem, Badge } from '@astrojs/starlight/components';`
+    3. **Asides (警告与约束):** - 严重警告/禁止行为使用：`:::danger[系统级约束]`
+       - 边界限制使用：`:::caution[边界与限制]`
+       - 普通提示使用：`:::note[说明]`
+    4. **Tabs:** 如果示例部分同时包含 Request 和 Response，必须使用 `<Tabs>` 和 `<TabItem>` 组件拆分。
+    5. **Badge (API 规范):** 如果涉及 API，请将 HTTP Method 使用 `<Badge>` 高亮（GET 使用 note, POST 使用 success, PUT 使用 caution, DELETE 使用 danger）。示例：`**<Badge text="POST" variant="success" size="medium" />** /api/v1/resource`
+    6. **表格:** 保留原生 Markdown 表格，不要用 HTML 包裹。
+
+    # Input Text
+    [在此处粘贴步骤 1 生成的 Markdown 文本]
+
+    # Output Request
+    直接输出完整的 `.mdx` 文件代码，不要包含任何解释性对话。确保代码格式完全正确，可直接复制进工程中。
+    ```
+  </TabItem>
+</Tabs>

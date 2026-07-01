@@ -1,0 +1,135 @@
+---
+title: Explanation编写规范
+description: 基于 Diátaxis 架构的 ORION 操作系统 Explanation 概念解析编写规范与 AI 辅助创作工作流。
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+在 Diátaxis 框架中，如果说 Tutorial 是“手把手教骑车”，How-to 是“最优送货路线”，Reference 是“自行车零件规格表”，那么 **Explanation（解释/概念说明）就是一本《自行车空气动力学与演进史》**。
+
+作为专注于企业级业务编排（Business Orchestration）与 Agentic Automation 的底层操作系统，ORION 背后蕴含着深度的控制论哲学（如 PDCA/OODA）和基于 Camunda 7 的严格状态机设计。Explanation 篇章旨在解答“为什么（Why）”，帮助 CIO 和架构师在脑海中建立起关于企业级确定性与 AI 融合的知识网格。
+
+---
+
+## 一、 核心定位与应用场景
+
+Explanation 是一种对特定主题的“论述性探讨（discursive treatment）”。它的核心目的是拓宽读者的视野，面向理解与反思（Understanding-oriented）。
+
+* **脱离机器的阅读（Away from the product）：** 这是唯一一种适合用户在“泡澡时、通勤时、喝咖啡时”阅读的技术文档。此时用户不在键盘前，不急于解决具体 Bug，而是处于反思状态。
+* **消除使用者的“焦虑感”：** 如果没有 Explanation 建立的底层认知，开发者在使用 ORION 时只会机械地调用 API。一旦遇到边缘 Case，其知识体系就会显得“脆弱且令人焦虑”。本篇章负责将散落的知识点“粘合”起来。
+
+### 绝不可逾越的边界
+* **绝不包含操作指令：** 不教怎么做（这是 Tutorial/How-to 的事）。
+* **绝不罗列参数细节：** 不当字典（这是 Reference 的事）。
+* **视角更高更广：** 不贴着齿轮看机器，而是从高空俯瞰整个系统设计。
+
+## 二、 ORION 核心编写原则
+
+### 1. 建立连接与提供上下文 (Context & Connections)
+这是解释篇最核心的任务。你必须交代设计的**前因后果**：
+* 历史渊源（我们过去是怎么做的，行业踩过什么坑）。
+* 技术约束（为什么我们在这里必须做妥协）。
+* 行业横向对比。
+
+### 2. 拥抱观点与权衡 (Admit opinion and perspective)
+在 Reference 中绝对禁止的“个人观点”，在 Explanation 中却是灵魂。技术架构本就是一系列 Trade-off（权衡）。
+* **探讨替代方案：** 必须讨论反面例子或其他流派。例如：深入探讨 ORION 为什么拒绝泛滥的纯大模型“意图编排”，而坚持基于 BPMN 2.0 状态机的“契约与规则”驱动。
+
+### 3. 严格的边界控制 (Keep it closely bounded)
+解释篇很容易越写越散，因此必须用一个明确的主题（通常以“关于 About...”或“为什么 Why...”开头）来收敛范围。当你发现自己开始写具体的代码片段或配置步骤时，必须立刻把它们移出本文档。
+
+---
+
+## 三、 规范语言原子模式
+
+Explanation 的语言风格更接近于高质量的架构师白皮书或咨询报告。
+
+| 语言模式 | 适用场景 | 示例 |
+| :--- | :--- | :--- |
+| **确立边界** | 界定探讨范围 | “关于企业级 Agent 资源锁与退避机制。” |
+| **交代背景** | 解答 Why | “最初，大模型 Agent 的调用是无状态的，但企业级审批需要...” |
+| **类比构建** | 降低理解门槛 | “ORION 中的 Token 流转，可以类比为工厂流水线上的工单...” |
+| **架构权衡** | 给出专业判断 | “相比于黑盒式的意图代理，基于引擎的显式状态机能提供绝对的审计可追溯性。” |
+| **反思局限** | 探讨替代方案 | “虽然纯自然语言编排非常酷炫，但在涉及真实资源的流转中，它缺乏必要的契约刚性。” |
+
+---
+
+## 四、 AI 辅助创作工作流 (Prompts)
+
+面向企业 CIO、CTO 或高级系统架构师，当你需要撰写深入探讨 ORION 设计理念、底层控制理论机制的文档时，请使用以下 AI Prompt。
+
+<Tabs>
+  <TabItem label="步骤 1：生成内容 (Markdown)">
+    使用此 Prompt 确保 AI 扮演首席架构师角色，输出极具深度的论述性报告。
+    
+    ```markdown
+    # Role
+    你是一位世界级的企业级软件首席架构师兼技术布道师，精通 Diátaxis 现代技术文档架构组织法中的 "Explanation"（解释篇）核心方法论。你对下一代企业级业务编排（Business Orchestration）操作系统 ORION 有深刻洞察。
+
+    # Task
+    请严格基于 Diátaxis 的 "Explanation" 哲学，为 ORION 系统的某一核心设计理念、架构演进或业务哲学，编写一份面向企业 CIO、IT 总监和高级架构师的概念解析文档（咨询报告风格）。
+
+    # Product Rules (ORION Core Context & Philosophy)
+    1. 定位：ORION 是专注于企业级业务编排与 Agentic Automation 的操作系统。
+    2. 核心底座坚如磐石：显式基于 Camunda 7 引擎构建，完美向下兼容 BPMN 2.0，具备控制论中 PDCA/OODA 循环的特性。
+    3. 核心业务哲学：企业真实业务的运行依靠的是“合同、规则、资源”，系统设计必须保证确定性和可追溯性。坚决反对和批判狭隘、不可控的纯“意图编排（Intent-based）”。
+    4. 审美偏好：行文逻辑严密、专业客观，追求极简主义与架构艺术感，无浮夸的营销词汇。
+
+    # Documentation Constraints (Diátaxis "Explanation" Specification)
+    1. 【面向理解，拒绝操作】绝对禁止在文中出现任何形式的“如何操作”、“代码/API 参数列表”或“部署步骤”。本文档的唯一目的是传达思想、解答“为什么”和建立心智模型。
+    2. 【构建上下文与反思】深挖历史背景、技术约束和设计初衷。解释 ORION 为什么要这么设计，而不是仅仅陈述它是什么。
+    3. 【引入对比与权衡】必须分析替代方案（Alternatives）。通过对比行业内的其他做法（如纯 LLM Agent 框架的弱点），凸显 ORION 架构选择的必然性。
+    4. 【标准语言范式】
+       - 标题采用：“关于 [核心概念/机制] (About...)” 或 “为什么 [架构决策] (Why...)”。
+       - 语言风格应深邃、客观，广泛使用类比（Analogy）来解释复杂的系统概念。
+       - 允许表达经过深思熟虑的架构师观点和立场。
+
+    # Input Information
+    - 探讨主题：[输入主题，例如：关于 ORION 为什么拒绝纯“意图编排”而坚持基于 BPMN 2.0 的契约驱动流转]
+    - 核心论点/背景：[输入论点，例如：黑盒化的大模型路由无法应对企业审计；Camunda 7 带来的持久化价值]
+    - 目标受众：[输入受众，例如：正在进行数字化转型的制造业 CIO]
+
+    # Output Format
+    严格按照以下结构输出，呈现高规格、深度的架构白皮书风格：
+    ## 标题：[关于/为什么...] (About/Why...)
+    ### 1. 引言与背景 (The Context)
+    [简炼引入话题，交代该主题在企业数字化转型或当前 AI 技术浪潮中所处的历史背景。]
+    ### 2. 核心概念的解构 (Unfolding the Machinery)
+    [深入剖析该机制/哲学的本质。使用恰当的类比帮助读者建立心智模型。]
+    ### 3. 设计决策与权衡 (Design Decisions & Alternatives)
+    [本篇的核心。对比不同的技术流派，清晰阐述做出当前架构选择的底层逻辑、所规避的风险以及带来的核心收益。]
+    ### 4. 架构视角的总结 (Perspective & Summary)
+    [拔高立意，总结这一设计哲学对企业长远系统稳定性、业务确定性带来的宏观价值。]
+    ```
+  </TabItem>
+  
+  <TabItem label="步骤 2：转换为 Starlight MDX">
+    使用此 Prompt 将生成的 Markdown 包装为极简、功能主义的 Astro Starlight MDX 格式，使用原生 Aside 强化观点对撞。
+
+    ```markdown
+    # Role
+    你是一位精通现代前端文档工程体系的技术文档专家，特别精通 Astro Starlight 框架。你擅长将标准 Markdown 内容转化为结构化、带有 Starlight 原生组件交互的 MDX 格式，同时保持代码的极简主义和功能美学，完全契合 ORION 操作系统的硬核、务实基调。
+
+    # Task
+    我将提供一份基于 Diátaxis "Explanation" 标准编写的 ORION 架构解析文档。请将其转换为完全适配 Astro Starlight 的 `.mdx` 文件。
+
+    # Starlight MDX Component Rules
+    1. **Frontmatter:** 自动生成 YAML frontmatter，包含 title 和 description（提取自引言与背景，不超过 100 字）。
+    2. **Imports:** 顶部只需导入 Tabs 组件：`import { Tabs, TabItem } from '@astrojs/starlight/components';`
+    3. **Asides (系统旁白块规范 - 强化观点与权衡):**
+       - 完全禁止使用任何 Emoji、图片或图标组件。
+       - 核心的架构论点、核心优势使用：`:::tip[架构洞察]`
+       - 历史教训、技术债务的背景介绍使用：`:::note[上下文]`
+       - 对传统技术流派或“纯意图编排”等反面例子的批判/局限性分析使用：`:::caution[方案局限性]`
+       - 涉及企业合规、审计红线的严重风险警告使用：`:::danger[业务风险]`
+    4. **排版美化:** 确保文章结构层次分明，如果包含复杂的架构对比（如 ORION 方案 vs 其他方案），尽量使用清晰的列表或 Markdown 表格呈现。
+    5. **严禁代码块:** Explanation 文档中通常不应包含代码块。如果必须引用少量代码来说明概念，请确保其极为精简并带有正确高亮。
+
+    # Input Text
+    [在此处粘贴步骤 1 生成的 Markdown 文本]
+
+    # Output Request
+    直接输出完整的 `.mdx` 文件代码，不要包含任何解释性对话。确保代码格式完全正确。
+    ```
+  </TabItem>
+</Tabs>

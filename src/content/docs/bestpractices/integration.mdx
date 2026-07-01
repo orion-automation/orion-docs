@@ -1,0 +1,118 @@
+---
+title: 服务调用与AI集成
+description: 探讨从传统流转引擎向下一代协作架构演进的底层脉络，涵盖微服务及 AI Agent 的业务编排集成模式。
+---
+
+在企业级业务流程编排中，流程引擎的核心职能是作为“状态机”和“协调者”。通过编写精简的胶水代码（Glue Code），引擎能够将 BPMN 模型中的控制流映射到运行在 JVM 中的本地业务逻辑或远程异构服务上。
+随着技术演进，这一集成模式正经历着从传统单体向分布式、再到现代 AI Agentic Automation（智能体自动化）的转变。
+
+## 1. 理解两种根本集成模式：Push（推）与 Pull（拉）
+
+在将业务代码连接到 BPMN 流程模型时，底层存在两种截然相反的通信拓扑：
+
+### 1.1 Push（推模式）
+* **机制**：流程引擎在执行到特定节点时，主动发起服务调用或执行脚本。
+* **代表技术**：Java 委托（Java Delegates）、表达式（Expressions）、内置连接器（Connectors）。
+* **特点**：通常要求业务代码与引擎同构或处于可直接无缝调用的网络上下文中。
+
+### 1.2 Pull（拉模式）
+* **机制**：流程引擎不直接调用外部服务，而是将任务发布至特定主题（Topic）并挂起。外部的独立工作线程（Workers）主动轮询（Poll）引擎 API，获取任务、异步执行，并在完成后通知引擎。
+* **代表技术**：外部任务（External Tasks）。
+
+:::note[AI Agent 集成视角]
+AI Agent 本身具备高度的自主性、目标导向与不确定的执行时长。如果在流程编排中将 Agent 视为一个传统的、同步的 API（Push 模式），极易因 LLM 响应延迟或长推理周期导致引擎线程耗尽。因此，Pull 模式（External Task 架构）是编排 AI Agent 的天然底座，它让智能体能够作为独立的 Worker 自由接入。
+:::
+
+## 2. 核心集成路径详解
+
+### 2.1 外部任务 (External Tasks)
+外部任务模式下，Worker 线程通过 ORION 客户端库（Java/Node.js）或直接基于 OpenAPI 规范生成的 REST 客户端与引擎交互。
+
+核心技术优势：
+* **时间解耦 (Temporal decoupling)**：天然替代了传统的消息队列（MQ），避免了为单个任务架设独立消息总线的运维成本。
+* **多语言多生态 (Polyglot architectures)**：Worker 可以采用任何语言编写。在现代 AI 场景中，这意味着基于 Python 生态（LangChain、AutoGen 等）构建的 AI 智能体可以毫无壁垒地接入流程。
+* **独立弹性扩展 (Better scaling)**：可以根据特定 Topic 的任务负载（例如高耗能的 GPU 图像处理或 LLM 推理），单独对该 Worker 进行横向扩容。
+* **安全穿透与云端桥接**：支持引擎部署在云端，而 Worker 部署在企业私有云或本地机房，只需通过基于 SSL 的 REST API 即可安全拉取任务，对防火墙极其友好。
+* **规避事务超时**：由于采用异步非阻塞的拉取机制，完美解决了长达数小时甚至数天的长周期任务带来的连接超时问题。
+
+### 2.2 Java 委托 (Java Delegates)
+Java 委托是实现了 `JavaDelegate` 接口的简单 Java 类。通过依赖注入（Spring/CDI），可以使用 `camunda:delegateExpression` 将其与 BPMN 的 `serviceTask` 连接。
+
+标准的 JavaDelegate 执行周期包含三步：
+* **输入数据映射**：将流程变量转化为业务所需的对象。
+* **调用独立业务服务**：调用核心业务领域的 Service Bean。切忌将复杂的业务逻辑直接揉进 Delegate 类中，应保持其纯粹的“胶水”性质。
+* **输出数据映射**：捕获业务异常，并将其转化为 BPMN 错误（BpmnError）或更新流程变量以驱动后续分支。
+
+## 3. 技术决策矩阵：五种集成方式详细对比
+
+针对不同的业务边界与现代 AI 协作需求，各集成方式的横向对比如下：
+
+| 特性 / 维度 | Java 委托 (Java Delegate) | 表达式 (Expression) | 内置连接器 (Connector) | 外部任务 (External Task) | 脚本任务 (Script Task) |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **底层核心机制** | 调用实现 JavaDelegate 接口的 Named Bean 或 Java 类 | 使用 JUEL（表达式语言）动态求值 | 使用开箱即用的配置化连接器（REST/SOAP） | 外部 Worker 线程主动拉取任务并异步反馈结果 | 在引擎内部的 JSR-223 脚本引擎中执行代码 |
+| **通信拓扑方向** | Push（推） | Push（推） | Push（推） | Pull（拉） | Push（推） |
+| **主流技术栈** | Java / JVM 内部调用 | 表达式语言（可引用 Java 宿主环境） | BPMN XML 配置属性 | 任何能与 REST API 交互的语言（Java, Node.js, Python 等） | Groovy, JavaScript, JRuby, Jython |
+| **现代 AI / Agent 适配度** | ❌ 极低。强绑定 JVM，难以接入主流 Python AI 生态，同步阻塞极易拖垮引擎线程。 | ❌ 极低。仅适于微量状态求值，无法承载智能体复杂的决策链。 | ⚠️ 中等。可用于标准的、轻量级的 LLM 单次 API 请求（Tool Call），但不适合复杂智能体协同。 | **最高。天然契合 AI 生态，完美隔离 GPU 耗时、多 Agent 长周期观察-思考-行动循环。** | ⚠️ 低。内嵌脚本难以维护复杂的 Agent 提示词工程与上下文管理。 |
+| **代码补全与重构** | 支持（依赖 IDE） | 支持（依赖 IDE） | 较弱（取决于平台支持） | 完全独立（在 Worker 自有项目中） | 取决于语言与 IDE 插件 |
+| **编译器静态检查** | 支持 | 支持 | ❌ 不支持 | 完全独立 | 取决于脚本语言 |
+| **依赖注入 (DI)** | 支持 (Spring/CDI) | 支持 | ❌ 不支持 | ❌ 不直接支持（由 Worker 自身容器管理） | ❌ 不支持 |
+| **单元测试成本** | 需注册 Mock 豆或在 Delegate 内部 Mock 业务逻辑 | 需注册 Mock 豆 | 较难，缺乏依赖注入，不易 Mock 外部端点 | 极易。由于服务不是被动激发的，Worker 逻辑可完全脱离引擎独立测试 | 需考虑外部脚本资源加载与 Mock 环境 |
+| **故障容错与重试** | 依赖引擎内建的 Job Executor 重试策略与 Incident 管理 | 同左 | 同左 | Worker 级自主锁定、自定义重试间隔、反馈错误后由引擎触发 Incident | 依赖引擎内建重试机制 |
+| **弹性扩展能力** | 需对流程引擎整体进行集群扩容 | 同左 | 同左 | 极强。可根据 Topic 独立、动态地启停任意数量的 Worker 实例 | 依赖引擎 Job Executor 调节 |
+| **核心适用场景** | 仅用于对延迟极其苛刻、必须在几毫秒内同步返回响应的同构 JVM 遗留系统。 | 用于在 BPMN 流程中定义微小的、非侵入性的判断或取值逻辑。 | 追求完全自包含、无需任何额外编程的纯 BPMN 建模环境。 | 绝大多数场景的通用标准。微服务架构、异构系统集成、多语言开发及 AI 智能体编排。 | 无 Java 依赖时，在流程中嵌入轻量级数据清洗或格式转换。 |
+
+## 4. 典型技术场景下的集成方案示例
+
+### 4.1 传统企业级系统集成（遗留系统粘合）
+即使进入智能化时代，自动化平台仍需向下兼容企业原有的信息化底座：
+* **SOAP Web 服务**：推荐使用 Maven 插件通过 WSDL 生成 JAX-WS 客户端，并在 JavaDelegate 或外部 Worker 中调用，以获得完整的 IDE 代码补全与编译检查；只有在追求无代码 XML 自包含时才选用内置 SOAP Connector。
+* **REST Web 服务**：推荐采用 JAX-RS 或 RestEasy 等标准库编写健壮的 REST 客户端进行封装。
+* **消息队列 (JMS)**：在 JavaDelegate 中利用规范获取 `QueueConnectionFactory`，向传统企业总线（ESB）异步投递消息，需注意在投递时生成并绑定唯一的 `correlationId`（通常为 UUID），以便后续异步回调时能精准唤醒对应的流程实例。
+* **关系型数据库 (SQL)**：对于简单的事务处理，通过 `DataSource` 建立 JDBC 连接执行 Prepared Statement；若面对复杂的 ORM 实体映射，则应引入 JPA 抽象，同时必须注意显式管理好业务数据库与流程引擎底层持久化数据库的事务隔离与加入（Join）策略。
+
+### 4.2 现代 AI Integration 场景集成（AI Agent 协同示例）
+针对下一代大模型与智能体的调用，标准的架构方案是利用 External Task 建立一个 Python Worker。
+
+**业务场景**：一个需要执行“合同合规性审查”的节点，该任务由一个具有自省能力（Reflection）的 AI Agent 团队完成。
+
+**BPMN 配置**：
+```xml
+<serviceTask id="agent_contract_review"
+             camunda:type="external"
+             camunda:topic="ai_contract_agent"
+             name="AI 智能体合同合规审查" />
+
+```
+
+**Python AI Worker 实现逻辑**：
+
+```python
+from camunda.external_task.external_task_worker import ExternalTaskWorker
+from my_agent_library import LegalAgentTeam # 假设的 Agent 框架
+
+def perform_review(task):
+    # 1. 提取输入映射：从流程上下文中获取合同文本 URL
+    contract_url = task.get_variable("contract_download_url")
+    
+    # 2. 智能体执行：Agent 团队开始多轮观察、工具调用与推理（可能耗时数分钟）
+    agent_team = LegalAgentTeam()
+    review_result = agent_team.run(f"请审查该合同的潜在法律风险: {contract_url}")
+    
+    # 3. 输出数据映射：将结构化的风险报告与评分传回流程引擎
+    return task.complete(global_variables={
+        "is_compliant": review_result.is_safe,
+        "risk_score": review_result.score,
+        "ai_report_json": review_result.detailed_report
+    })
+
+# 启动拉取 Worker，完全不占用流程引擎的线程与算力资源
+ExternalTaskWorker(worker_id="agent_worker_01").subscribe("ai_contract_agent", perform_review)
+
+```
+
+## 5. 总结
+
+从 ORION 引擎的演进路径可以看出，从强耦合的 Push 模式（Java Delegates）全面倒向解耦的 Pull 模式（External Tasks），是自动化向云原生分布式演进的必然趋势。
+
+这一模式的转变，恰好完美契合了现代 AI Agent 对异构语言栈、异构计算资源（GPU）、以及长异步执行周期的底层诉求。在构建下一代业务编排系统时，将引擎退居为纯粹的“状态协调者”，把执行权彻底交给分布式的、甚至具备自主决策能力的外部 Worker（无论是微服务还是 AI 智能体），是确立现代架构的核心基石。
+

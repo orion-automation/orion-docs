@@ -1,0 +1,21 @@
+---
+title: ORION REST API
+template: splash
+editUrl: false
+---
+
+{/* Scalar 容器：日文配置，强行覆盖英文按钮内容 */}
+<script 
+  id="api-reference" 
+  data-url="/openapi.json"
+  data-configuration='{"theme": "default", "showSidebar": true, "localization": {"locale": "en", "translations": {"operation": {"testRequest": "テストリクエストを送信 (Test)", "responses": "レスポンス (Responses)", "clientLibraries": "クライアントライブラリ (Clients)"}, "sidebar": {"searchBox": "検索 (Search)..."}}}}'
+></script>
+
+<script src="/js/scalar.js"></script>
+
+<style>{`
+  :root { --theme-color-1: var(--sl-color-accent); }
+  .content-panel { padding: 0 !important; }
+  .sl-container { max-width: 100% !important; margin: 0 !important; }
+  h1#_top { display: none; }
+`}</style>

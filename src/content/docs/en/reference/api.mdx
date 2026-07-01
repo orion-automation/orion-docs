@@ -1,0 +1,24 @@
+---
+title: ORION REST API
+description: ORION 底层控制引擎与业务编排 API 参考
+template: splash
+editUrl: false
+---
+
+{/* Scalar 容器：用 data-configuration 直接下发配置，指定 zh-CN */}
+<script 
+  id="api-reference" 
+  data-url="/openapi.json"
+  data-configuration='{"theme": "default", "showSidebar": true, "localization": {"locale": "en"}}'
+></script>
+
+{/* 引入本地化的 Scalar 核心库 */}
+<script src="/js/scalar.js"></script>
+
+{/* 样式微调，解决 MDX 编译报错 */}
+<style>{`
+  :root { --theme-color-1: var(--sl-color-accent); }
+  .content-panel { padding: 0 !important; }
+  .sl-container { max-width: 100% !important; margin: 0 !important; }
+  h1#_top { display: none; }
+`}</style>
