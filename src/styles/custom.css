@@ -408,3 +408,40 @@ a.orion-clickable-card:hover .card {
 :where(.scalar-api-reference) .cm-content {
     font-family: var(--scalar-font-code) !important;
 }
+
+/* 覆盖 Starlight Badge 的默认样式，实现轻盈去边框的圆角风格 */
+:root .sl-badge {
+  border: none !important;           /* 移除默认的边框 */
+  border-radius: 9999px !important;  /* 设置为全圆角 (药丸形状) */
+  font-weight: 500 !important;       /* 文字字重调轻，不要太粗 */
+  padding: 0.15rem 0.6rem !important;/* 增加左右内边距，让形状更舒展 */
+  font-size: 0.85em !important;      /* 稍微缩小字号显得更精致 */
+}
+
+/* 针对参考图中类似“紫蓝色”的基础样式 (对应 Starlight 的 default/note 变体) */
+:root .sl-badge.default,
+:root .sl-badge.note {
+  background-color: #f0f0ff !important; /* 极浅的紫蓝背景 */
+  color: #6633ff !important;            /* 鲜明的紫蓝文字 */
+}
+
+/* 如果你的文档中还用到了其他颜色的 Badge，可以顺便做一套浅色系适配 */
+
+/* Tip (提示 - 通常是绿色) */
+:root .sl-badge.tip,
+:root .sl-badge.success {
+  background-color: #e6f6ec !important;
+  color: #10b981 !important;
+}
+
+/* Caution (警告 - 通常是橙色/黄色) */
+:root .sl-badge.caution {
+  background-color: #fff4e5 !important;
+  color: #f59e0b !important;
+}
+
+/* Danger (危险 - 通常是红色) */
+:root .sl-badge.danger {
+  background-color: #fee2e2 !important;
+  color: #ef4444 !important;
+}
