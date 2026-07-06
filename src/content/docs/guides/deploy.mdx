@@ -34,7 +34,7 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 
 请参考项目中的 compose.yml 文件，调整必要的环境变量，并使用 Docker Compose 启动服务。
 
-```yaml
+```yaml title="compose.yml"
 services:
   eorion:
     image: <image-name>
@@ -70,7 +70,7 @@ docker-compose -f compose.yml up -d
 
 compose文件中以下配置项目依赖于nocoDB，Metabase和Dify的安装部署。如果你需要使用它们的能力，则需要在安装 ORION 之前完成它们的安装及必要配置。
 
-```yaml
+```yaml title="compose.yml"
 environment:
       - EORION_CONFIG_NOCODB_URL=<nocodb 的完整 URL，如需连接>
       - EORION_CONFIG_NOCODB_TOKEN=<nocodb 的访问令牌，如需连接>
@@ -99,7 +99,7 @@ Dify 在 ORION 平台中承担智能对话与 AI 任务编排的功能。
 它支持通过可视化方式构建基于LLM的对话流或工作流（Chatflow或Workflow），并结合 RAG（Retrieval-Augmented Generation）机制，从知识库中检索企业专属信息，实现上下文增强的智能应答。
 
 EORION_CONFIG_META的配置样例如下：
-```json
+```json title="compose.yml"
 {
   "smartAgent": {
     "url": "对应Dify应用的url",
