@@ -90,6 +90,7 @@ export default defineConfig({
                             } // 指向 src/content/docs/reference/api.mdx
                         },
                         // 2. 手动定义 bpmn 目录，并为其配置多语言
+                       // 2. 手动定义 bpmn 目录，并为其配置多语言与子文件夹扩展
                         {
                             label: 'BPMN',
                             translations: {
@@ -98,12 +99,54 @@ export default defineConfig({
                                 ja: 'BPMN 仕様'
                             },
                             collapsed: true,
-                            // 在这里自动生成 bpmn 文件夹下的内容
-                            items: [{ autogenerate: { directory: 'reference/bpmn', collapsed: true } }]
+                            items: [
+                                // 注意：如果 reference/bpmn 目录下有概览文档（如 index.mdx），可以放一记在最上方
+                                // { label: 'BPMN 概述', slug: 'reference/bpmn' },
+                                {
+                                    label: '事件',
+                                    translations: {
+                                        root: '事件 (Events)',
+                                        en: 'Events',
+                                        ja: 'イベント'
+                                    },
+                                    collapsed: true,
+                                    items: [{ autogenerate: { directory: 'reference/bpmn/events', collapsed: true } }]
+                                },
+                                {
+                                    label: '任务',
+                                    translations: {
+                                        root: '任务 (Tasks)',
+                                        en: 'Tasks',
+                                        ja: 'タスク'
+                                    },
+                                    collapsed: true,
+                                    items: [{ autogenerate: { directory: 'reference/bpmn/task', collapsed: true } }]
+                                },
+                                {
+                                    label: '子流程',
+                                    translations: {
+                                        root: '子流程 (Subprocesses)',
+                                        en: 'Subprocesses',
+                                        ja: 'サブプロセス'
+                                    },
+                                    collapsed: true,
+                                    items: [{ autogenerate: { directory: 'reference/bpmn/subprocess', collapsed: true } }]
+                                },
+                                {
+                                    label: '网关',
+                                    translations: {
+                                        root: '网关 (Gateways)',
+                                        en: 'Gateways',
+                                        ja: 'ゲートウェイ'
+                                    },
+                                    collapsed: true,
+                                    items: [{ autogenerate: { directory: 'reference/bpmn/gateway', collapsed: true } }]
+                                }
+                            ]
                         },
                         // 3. 手动定义 connector 目录
                         {
-                            label: 'Connector',
+                            label: '连接器',
                             translations: {
                                 root: '连接器',
                                 en: 'Connector',
