@@ -1,0 +1,78 @@
+---
+title: "Not to do: 通过 CRUD 直接修改引擎底层数据表"
+description: 解析为什么不能用直接修改数据库的方式来干预业务编排引擎的运行状态。
+sidebar:
+  label: "Not to: 直接修改数据表"
+  order: 1
+---
+
+在 ORION 业务编排引擎的运维或排障过程中，这是开发团队最容易踩中、且隐蔽性极强的一个技术陷阱。
+
+## 典型症状 (The Anti-Pattern)
+
+在处理诸如多实例节点卡死、网关路由异常，或者需要紧急将流程状态回退到上一个节点时，开发者为了“快速解决问题”，跳过了引擎提供的 API，直接连上数据库执行类似如下的 SQL 语句：
+
+```sql
+-- 强行修改执行实例的当前节点
+UPDATE ACT_RU_EXECUTION SET ACT_ID_ = 'Task_B' WHERE ID_ = '1001';
+-- 或者强行修改流程变量
+UPDATE ACT_RU_VARIABLE SET TEXT_ = 'approved' WHERE EXECUTION_ID_ = '1001';
+
+```
+
+这种做法将编排引擎降级成了一个普通的 CRUD 状态机。
+
+## 为什么这是个深坑？ (Technical Breakdown)
+
+从表面上看，数据库里的字段确实被改掉了，但在引擎的内存和运行机制中，这会从三个层面引发严重的级联故障：
+
+### 1. 触发乐观锁异常（OptimisticLockingException）
+
+引擎在处理并发流转时，强依赖数据库记录的版本控制（`REV_` 字段）来实现乐观锁。直接执行 SQL 修改数据，并不会同步更新内存缓存或并发事务中的版本号。
+**后果**：当并行网关（Parallel Gateway）发生合并，或系统接收到高并发回调时，版本号比对失败，当前事务将大面积触发 `OptimisticLockingException` 并回滚。
+
+### 2. 内存执行树（Execution Tree）割裂
+
+引擎在运行时不是简单地读写数据库，而是在内存中维护了一棵复杂的**执行树**，其中包含：变量作用域（Variable Scope）、活动实例（Activity Instance）以及事务边界。
+**后果**：直接改表意味着底层持久化状态被篡改，而内存中的上下文对此一无所知。这极易在后续的网关判断或子流程结束时，引发死循环或隐蔽的死锁。
+
+### 3. 绕过事件总线与事务补偿
+
+业务编排不仅是“向前走”，还包含复杂的异常处理。直接通过 SQL 改变状态，跳过了引擎内部的事件分发逻辑。
+**后果**：依附在原有节点上的边界定时器（Timer Boundary Event）不会被销毁；原本应该触发的事务补偿（Compensation Handlers）被直接跳过，导致跨系统的分布式数据出现最终不一致。
+
+---
+
+## 底层逻辑：引擎是 DFA，不是静态数据表
+
+要从根本上戒除这个习惯，需要理解引擎的基础计算机科学模型：**确定的有限状态机（Deterministic Finite Automaton）**。
+
+其内部运算逻辑由五元组严格定义：
+
+$$M = (S, \Sigma, \delta, s_0, F)$$
+
+在 ORION 引擎中：
+
+* **$S$** 是有限的状态集合（如当前停留在哪个 Task）。
+* **$\Sigma$** 是合法的输入事件（如 API 调用、消息触发）。
+* **$\delta$** 是转移函数（如业务路由规则）。
+
+状态 $S$ 的每一次变更，**必须**由合法的事件 $\Sigma$ 触发，并经过转移函数 $\delta$ 的计算。直接 UPDATE 数据库，本质上是跳过了 $\Sigma$ 和 $\delta$，强行篡改了 $S$。这破坏了状态机的数学严谨性。
+
+---
+
+## 正确姿势 (Do this instead)
+
+当遇到流程卡死、多实例异常，或需要人工干预运行时状态时，请严格遵守以下工程实践：
+
+**1. 熟练使用标准 Java API 与 REST API 介入流转**
+引擎核心暴露了完善的服务层接口（Services），涵盖了所有合法的状态干预手段。开发者应根据具体场景调用相应的接口，而不是编写直接操作数据库的脚本：
+*   **状态迁移与修正**：使用 `RuntimeService.createProcessInstanceModification()`。无论是通过 Java 原生调用，还是通过对应的 REST API（`POST /process-instance/{id}/modification`），引擎都会在底层自动接管执行树（Execution Tree）的裁剪、变量作用域的重建以及多余事件（如定时器、异步 Job）的级联清理。
+*   **人工任务干预**：当遇到需要强制接管的任务时，使用 `TaskService`（或 `POST /task/{id}/complete`）进行强制流转或重新分配（Assignee/Candidate Group），以确保流转历史（History Tables）被完整记录。
+*   **死信与异常重试**：当底层发生网络或并发异常导致节点卡死时，使用 `ManagementService` 介入。通过 `setJobRetries`（或 `PUT /job/{id}/retries`）重置失败 Job 的重试次数，让引擎的异步执行器（Job Executor）重新拾取任务。
+
+**2. 遵循事件驱动，而非数据驱动**
+如果需要强制改变流程走向，绝不能试图通过修改变量表来“欺骗”网关条件。正确的做法是向引擎触发 Message 或 Signal 事件。通过调用 Java 的 `RuntimeService.createMessageCorrelation()` 或请求 REST API（`POST /message`），让引擎的 Parser 依据业务模型中预先设计的路由规则（$\delta$）自行运算下一步状态，这样才能保证事件总线与补偿机制的完整性。
+
+**3. 在 ORION 平台利用可视化控制台操作**
+如果是运维或实施人员需要处理挂起的实例，应直接通过 ORION 的统一客户端入口或管理控制台，使用可视化界面提供的“状态重置 / 节点跳转 / 强制挂起（Suspend）”等功能。这些界面操作的底层同样封装了上述严密的引擎 API，在保证操作便捷性的同时，死守了底层架构的一致性底线。

@@ -4,6 +4,8 @@ import icon from 'astro-icon';
 import starlight from '@astrojs/starlight';
 import starlightThemeRapide from 'starlight-theme-rapide'
 import mermaid from 'astro-mermaid';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 
 // https://astro.build/config
 export default defineConfig({
@@ -20,6 +22,15 @@ export default defineConfig({
                 replacesTitle: true,
             },
             title: 'ORION Automation',
+            head: [
+        {
+          tag: 'link',
+          attrs: {
+            rel: 'stylesheet',
+            href: 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css',
+          },
+        },
+      ],
             lastUpdated: true,
             defaultLocale: 'root',
             locales: {
@@ -181,4 +192,9 @@ export default defineConfig({
             ],
         }),
     ],
+    markdown: {
+    // 开启数学公式解析
+    remarkPlugins: [remarkMath],
+    rehypePlugins: [rehypeKatex],
+  },
 });
