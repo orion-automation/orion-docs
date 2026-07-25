@@ -1,0 +1,147 @@
+
+---
+title: 分布式业务编排 - 一个使用流程引擎的实现案例
+description: 演示如何利用流程引擎的边界事件与补偿机制，实现基于 BPMN 的分布式业务事务模式。
+---
+
+现在，让我们以简单的脚本任务模拟实际业务中对预订模块的调用来实现一个分布式业务事务模式。
+
+## 设计BPMN模型
+
+完成后的BPMN模型应该如下图所示：
+
+![compensation.svg](/src/assets/img/compensation.svg)
+
+### 预订机票任务
+这是一个脚本任务，运行该任务将输出当前的时间戳和一行说明信息：
+
+```xml
+      <bpmn:scriptTask id="BookTicketActivity" name="预订机票" scriptFormat="javascript">
+        <bpmn:incoming>Flow_1ih5e6w</bpmn:incoming>
+        <bpmn:outgoing>Flow_1lcn5nk</bpmn:outgoing>
+        <bpmn:script>print(java.lang.System.currentTimeMillis());
+print("Ticket Booked!");</bpmn:script>
+      </bpmn:scriptTask>
+      <bpmn:boundaryEvent id="Event_1gqwpr6" attachedToRef="BookTicketActivity">
+        <bpmn:compensateEventDefinition id="CompensateEventDefinition_0birf2d" />
+      </bpmn:boundaryEvent>
+
+```
+
+:::note
+注意到其中的 `bpmn:boundaryEvent` 元素，这是一个补偿边界事件 (Compensation Boundary Event)，它会响应其后的取消结束事件 (Cancel End Event)，执行补偿任务。
+:::
+
+### 预订酒店任务
+
+这是一个脚本任务，运行该任务除了输出当前的时间戳和一行说明信息以外，还将抛出一个 `org.camunda.bpm.engine.delegate.BpmnError` 异常。正是该异常，会引起流程引擎执行异常事件路径，而非预订完成路径。
+
+```xml
+      <bpmn:scriptTask id="BookHotelActivity" name="预订酒店" scriptFormat="javascript">
+        <bpmn:incoming>Flow_1lcn5nk</bpmn:incoming>
+        <bpmn:outgoing>Flow_07ch3fs</bpmn:outgoing>
+        <bpmn:script>print(java.lang.System.currentTimeMillis());
+print("Book hotel failed!");
+throw new org.camunda.bpm.engine.delegate.BpmnError("Expected Error");</bpmn:script>
+      </bpmn:scriptTask>
+      <bpmn:boundaryEvent id="Event_171xrb9" attachedToRef="BookHotelActivity">
+        <bpmn:outgoing>Flow_1mxfnd6</bpmn:outgoing>
+        <bpmn:errorEventDefinition id="ErrorEventDefinition_0a84yz8" />
+      </bpmn:boundaryEvent>
+
+```
+
+:::note
+注意到其中的 `bpmn:boundaryEvent` 元素，这是一个异常边界事件 (Error Boundary Event)，它会捕获由预订酒店任务抛出的 `BpmnError` 异常，并执行后续操作。
+:::
+
+### 取消预定任务
+
+这也是一个脚本任务，与[预订机票任务](https://www.google.com/search?q=%23%E9%A2%84%E8%AE%A2%E6%9C%BA%E7%A5%A8%E4%BB%BB%E5%8A%A1)类似，它将输出当前的时间戳和一行说明信息：
+
+```xml
+      <bpmn:scriptTask id="CancelTicketActivity" name="取消预订" isForCompensation="true" scriptFormat="javascript">
+        <bpmn:script>print(java.lang.System.currentTimeMillis());
+print("Ticket Cancelled")</bpmn:script>
+      </bpmn:scriptTask>
+
+```
+
+## 运行BPMN模型
+
+我们使用一个 maven 构建的 Java 运行时环境来运行兼测试该 BPMN 模型，并且通过引入 [C7 Process Test Coverage](https://www.google.com/search?q=https://www.holunda.io/c7/2026.04.2/user-guide/c7-process-test-coverage/index.html%23highlights) 库同时提供测试覆盖率信息。
+
+### 测试引擎配置文件
+
+该文件名为 `camunda-coverage.cfg.xml`，其内容为:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="[http://www.springframework.org/schema/beans](http://www.springframework.org/schema/beans)"
+       xmlns:xsi="[http://www.w3.org/2001/XMLSchema-instance](http://www.w3.org/2001/XMLSchema-instance)"
+       xsi:schemaLocation="[http://www.springframework.org/schema/beans](http://www.springframework.org/schema/beans)   [http://www.springframework.org/schema/beans/spring-beans.xsd](http://www.springframework.org/schema/beans/spring-beans.xsd)">
+
+    <bean id="processEngineConfiguration" class="org.camunda.community.process_test_coverage.engine.platform7.ProcessCoverageInMemProcessEngineConfiguration">
+        <property name="jdbcUrl" value="jdbc:h2:mem:camunda;DB_CLOSE_DELAY=1000" />
+        <property name="jdbcDriver" value="org.h2.Driver" />
+        <property name="jdbcUsername" value="sa" />
+        <property name="jdbcPassword" value="" />
+        <property name="jobExecutorActivate" value="false" />
+        <property name="history" value="full" />
+    </bean>
+
+</beans>
+
+```
+
+需要注意的是，此处使用 `org.camunda.community.process_test_coverage.engine.platform7.ProcessCoverageInMemProcessEngineConfiguration` 替代一般常用的 `org.camunda.bpm.engine.impl.cfg.StandaloneInMemProcessEngineConfiguration` 作为流程引擎启动配置。
+
+### 测试类
+
+```java
+@Deployment(resources = {"compensation.bpmn"})
+public class CompensationTests {
+    @RegisterExtension
+    static ProcessEngineExtension extension = ProcessEngineCoverageExtension
+            .builder("camunda-coverage.cfg.xml")
+            .assertClassCoverageAtLeast(0.8)
+            .build();
+
+    @Test
+    void test() {
+        var pi = extension.getRuntimeService().startProcessInstanceByKey("CompensationProcess");
+
+        assertThat(pi).isEnded().hasPassed("BookTicketActivity", "CancelTicketActivity",
+                        "BookHotelActivity", "BookCancelEvent", "TripCancelEvent")
+                .hasNotPassed("BookCompleteEvent", "TripCompleteEvent");
+    }
+}
+
+```
+
+在这里，我们使用 JUnit5 进行测试，通过 `@RegisterExtension` 注解读取 `camunda-coverage.cfg.xml` 定义的配置信息从而初始化并启动一个流程引擎，并用该流程引擎创建一个 BPMN 模型的实例。
+
+接着，我们断言该流程实例已经完成（因为不存在中断节点），并且通过"预订机票任务"、"取消预定任务"、"预订酒店任务"、"预订取消事件"及"旅程预订取消"节点，而不会通过"预订完成事件"和"旅程预订完成事件"节点——这也是我们期望的路径。
+
+### 运行结果
+
+运行上述测试，在控制台将出现类似如下的结果：
+
+```txt
+1784858676773
+Ticket Booked!
+1784858676791
+Book hotel failed!
+1784858676811
+Ticket Cancelled
+
+```
+
+注意到"预订机票"、"预订酒店失败"及"取消预定"分别按照时间先后顺序发生，这是预期的结果。
+
+同时可以看到有关测试所覆盖/经过的路径：
+
+![result.png](/src/assets/img/result.png)
+
+```
