@@ -67,6 +67,6 @@ BPMN 2.0 规范在设计之初就考虑到了复杂的分布式事务语义 。�
     用于定义如何对某个 <Badge text="已成功完成" variant="success" /> 的节点进行“反向冲销” 。例如，若机票预订节点已执行成功，当后续酒店预订失败引发全局取消时，引擎会自动寻址并执行机票预订节点对应的补偿处理器（如调用退票/取消接口） 。
 </Steps>
 
-![BPMN compensation](/src/assets/img/compensation.svg)
+![BPMN compensation](/img/compensation.svg)
 
 通过 BPMN 的可视化模型，复杂的 Saga 状态机转换被抽象成了直观的图形化连接。底层的补偿寻址、重试路由等繁琐工作均由编排引擎接管，研发人员只需专注于定义独立节点的正向逻辑与反向补偿逻辑。
