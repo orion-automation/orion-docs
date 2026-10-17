@@ -1,0 +1,118 @@
+---
+title: Querying JSON
+description: Interface reference for querying, filtering and type-extracting JSON data with the JSONPath language.
+sidebar:
+  order: 3
+---
+
+## 1. Overview
+
+The SPIN JSON data format retrieves data through the JSONPath query language.
+
+JSONPath is declarative: a path expression locates a node inside a deeply nested JSON structure, extracts a collection, or filters by a business rule. That is what makes large payloads manageable.
+
+## 2. Query patterns
+
+A query starts with `.jsonPath(String path)`. The result then has to be converted with one of the conversion methods, such as `.element()` or `.elementList()`, before it can be used as a SPIN object or collection.
+
+The examples below use this JSON structure:
+
+```json
+{
+  "child": [
+    {"id": 1, "name": "Lucy", "sex": "female"},
+    {"id": 2, "name": "Tracy", "sex": "female"}
+  ],
+  "number": 1,
+  "boolean": true
+}
+
+```
+
+### 2.1 Querying an element
+
+Used when a specific node in the tree is known.
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+SpinJsonNode child = JSON(json).jsonPath("$.child[0]").element();
+
+```
+
+### 2.2 Querying an element list
+
+Extracts every node matching the path and returns a `SpinList<SpinJsonNode>`.
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+SpinList<SpinJsonNode> childs = JSON(json).jsonPath("$.child").elementList();
+
+```
+
+## 3. Type-specific extraction
+
+After a path expression, SPIN can return a result of a specific Java type directly.
+
+### 3.1 Extracting a string
+
+`.stringValue()` returns the string at the path.
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+String value = JSON(json).jsonPath("$.child[0].name").stringValue();
+
+```
+
+### 3.2 Extracting a number
+
+`.numberValue()` returns the number at the path as a `Double`.
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+Double count = JSON(json).jsonPath("$.number").numberValue();
+
+```
+
+### 3.3 Extracting a boolean
+
+`.boolValue()` returns the boolean at the path.
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+Boolean exists = JSON(json).jsonPath("$.boolean").boolValue();
+
+```
+
+## 4. Filtering a query
+
+JSONPath filters with the `?()` syntax inside a path.
+
+### 4.1 Filter syntax
+
+* **Placement**: the filter expression goes inside parentheses `()`.
+* **Quoting**: double quotes (`"`) are not accepted inside a filter expression. Use single quotes (`'`) throughout, or the query fails to parse.
+
+### 4.2 Filter example
+
+Filtering the child list down to records whose sex is `female`:
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+SpinList<SpinJsonNode> girls = JSON(json).jsonPath("$.child[?(@.sex == 'female')]").elementList();
+
+```
+
+
+## 5. Performance and constraints
+
+**Cost**: the JSONPath parser does extra work to evaluate a path, compared with direct `.prop()` access. Where the path depth is fixed and known, `.prop()` is the cheaper choice.
+
+**Empty results**: when a query matches nothing, the call may return an empty result or throw at the moment a value is read. Either make sure the structure is what the path expects, or guard the read with `try`/`catch`.
+
+**Single quotes**: property values compared inside a filter must be single-quoted. This is enforced by the parser, not a matter of style.

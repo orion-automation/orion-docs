@@ -1,0 +1,201 @@
+---
+title: HTTP connector
+description: Parameter contract, designer mapping, error and response handling, and constraints of the HTTP connector.
+---
+
+## 1. Overview
+
+The HTTP connector lets a process send REST and HTTP requests directly, without writing any Java delegation code. When no external component is involved, this is the default way to connect a process to a third-party API.
+
+The connector has a fixed identifier on the engine side: `http-connector`. The engine scans the classpath for connector implementations and takes the one behind that identifier, which is exactly the value the Connector ID field expects in the process designer.
+
+## 2. Using it in the process designer
+
+The HTTP connector is attached to a **Service task** or a **Send task**. Every item configured in the interface ends up as one of the input and output parameters the engine evaluates at runtime.
+
+### 2.1 Basic configuration
+
+Two declarations are needed in the properties panel:
+
+| Property | Value | Description |
+| :--- | :--- | :--- |
+| Implementation | Connector | Only this choice makes the connector input and output tables appear |
+| Connector ID | `http-connector` | The engine looks the implementation up by this identifier. A typo does not fail deployment; the connector is simply missing at runtime |
+
+### 2.2 Input parameters
+
+Input parameters are evaluated before the task runs and injected into the request object one by one.
+
+| Name | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `method` | String | Yes | HTTP verb: `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, `OPTIONS`, `TRACE` |
+| `url` | String | Yes | Target address. Accepts `${…}` expressions, so process variables can be composed at runtime |
+| `headers` | Map | No | Request headers. Commonly `Authorization`, `Content-Type`, `Accept` |
+| `payload` | Text or script | No | Request body, mainly for `POST` and `PUT`. For a dynamically built JSON body, set the type to script and generate it with an expression or template |
+
+No other input parameter names are recognized. Query parameters have no slot of their own and must be folded into `url`, as in `https://example.com/orders?page=1&size=50`. Literal parts are written as-is; parts taken from process variables are written as `${…}` and resolved by the engine.
+
+### 2.3 Output parameters
+
+When the request finishes, the response data sits in the connector's temporary context and is not written back to the process. To make it usable downstream it must be pulled out through an output parameter and given a process variable name.
+
+| Name | Type | Description |
+| :--- | :--- | :--- |
+| `statusCode` | String | HTTP status code such as `200` or `404`. Read it to branch on the outcome |
+| `response` | Text or script | The response body. **It is a string, not an object**: reading individual fields downstream means parsing it as JSON first |
+| `headers` | Map | Response headers, useful for validating tokens or reading cache directives |
+
+Output parameters read the opposite way from input parameters: the left side names the process variable to store into, the right side is the expression to evaluate — for example storing `statusCode` into `orderStatus`. To read a field, use a JSON expression such as `S(response).prop("total")`.
+
+### 2.4 Relationship to connector resources
+
+A connector resource in the Build module maintains the same set of call parameters: endpoint address, method, request header template, query parameters, request body template and response fields. Attaching it to a service task compiles that content into the two parameter tables described above, filling `url`, `headers` and `payload` with runtime process variables.
+
+The two are therefore not separate configurations but two views of one call plan: the connector resource is the reusable unit, and the parameter tables in the properties panel are how it lands on a single task.
+
+## 3. Underlying HTTP client
+
+The connector does not implement transport itself; requests are issued by Apache HttpClient, so its configuration applies as well.
+
+- By default the standard HttpClient configuration is used, and the HTTP system properties it supports are honored.
+- The engine uses HttpClient 5.x, with the `org.apache.hc.client5.*` and `org.apache.hc.core5.*` package structure. The high-level connector interface stays compatible, but any custom configuration or extension code must be written against 5.x packages.
+
+## 4. Custom configuration
+
+When the defaults are not enough — a specific connection pool size, say, or a different connection manager — implement and register a connector configurator.
+
+### 4.1 Writing a configurator
+
+The example below injects a custom connection pool into the connector:
+
+```java
+package com.example.connector;
+
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.camunda.connect.httpclient.HttpConnector;
+import org.camunda.connect.httpclient.impl.AbstractHttpConnector;
+import org.camunda.connect.spi.ConnectorConfigurator;
+
+public class HttpConnectorConfigurator implements ConnectorConfigurator<HttpConnector> {
+
+  public Class<HttpConnector> getConnectorClass() {
+    return HttpConnector.class;
+  }
+
+  public void configure(HttpConnector connector) {
+    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+    connectionManager.setDefaultMaxPerRoute(10);
+    connectionManager.setMaxTotal(200);
+
+    CloseableHttpClient client = HttpClients.custom()
+      .setConnectionManager(connectionManager)
+      .build();
+    ((AbstractHttpConnector) connector).setHttpClient(client);
+  }
+}
+```
+
+### 4.2 Registering a configurator
+
+The engine discovers configurators through SPI. Add a file named `META-INF/services/org.camunda.connect.spi.ConnectorConfigurator` under the project's resources directory and write the fully qualified class name into it:
+
+```
+com.example.connector.HttpConnectorConfigurator
+```
+
+When several configurators are on the classpath, the engine calls all of them in turn.
+
+## 5. Calling the connector directly
+
+From Java or from a custom component, requests can be sent through the fluent interface.
+
+### 5.1 Creating a request
+
+```java
+// Simple GET
+http.createRequest()
+  .get()
+  .url("https://example.com/orders")
+  .execute();
+
+// POST with a body
+http.createRequest()
+  .post()
+  .url("https://example.com/orders")
+  .contentType("text/plain")
+  .payload("Hello World!")
+  .execute();
+```
+
+### 5.2 Adding request headers
+
+```java
+HttpResponse response = http.createRequest()
+  .get()
+  .header("Accept", "application/json")
+  .url("https://example.com/orders")
+  .execute();
+```
+
+## 6. Error handling
+
+By default a 4XX or 5XX response does not raise an exception — the request returns as usual and the status code stays in `statusCode`. Whether the process continues is up to the gateway that follows.
+
+To make the current path stop on an error, set the configuration option `throw-http-error` to `TRUE`:
+
+```java
+HttpResponse response = http.createRequest()
+  .get()
+  .configOption("throw-http-error", "TRUE")
+  .url("https://example.com/orders")
+  .execute();
+```
+
+The same setting can be given in the process designer as the input parameter `throw-http-error`. Once enabled, a failing response throws, which in turn triggers an error boundary event attached to the task — no scripted check needed.
+
+## 7. Response handling
+
+The response object exposes the status code, headers and body.
+
+```java
+Integer statusCode = response.getStatusCode();
+String contentType = response.getHeader("Content-Type");
+String body = response.getResponse();
+```
+
+Code that consumes the response must call `response.close()` to release the connection. When the connector is used through parameter mapping in a process, the engine handles that.
+
+## 8. Generic interface
+
+Besides the fluent methods, the connector offers a generic interface that takes parameters by name. The input and output parameter tables in the process designer are built on exactly this interface.
+
+### 8.1 Setting request parameters
+
+```java
+HttpRequest request = http.createRequest();
+request.setRequestParameter("method", "GET");
+request.setRequestParameter("url", "https://example.com/orders");
+request.setRequestParameter("payload", "hello world!");
+```
+
+### 8.2 Reading response parameters
+
+```java
+response.getResponseParameter("statusCode");
+response.getResponseParameter("headers");
+response.getResponseParameter("response");
+```
+
+## 9. Constraints and prerequisites
+
+| Constraint | Description |
+| :--- | :--- |
+| Only four input parameters | `method`, `url`, `headers`, `payload`. There is no separate query, timeout or retry parameter; those are solved in the address, in headers, or in the process around the task |
+| No notion of a service base URL | The connector only accepts a complete address. Switching hosts per environment means referencing a process variable in `url` and providing it at deployment |
+| Relative addresses need an extra variable | A relative address produced from a connector resource becomes `${baseUrl}`, so a process variable named `baseUrl` must exist at runtime or the request fails outright |
+| Body values are always strings | A body supplied through the parameter table is sent as a string. Numbers, booleans and nested structures must be serialized by you |
+| Field-level output needs JSON parsing | The connector only returns the body as a string. Reading individual fields requires JSON parsing to be available; otherwise the expression fails to evaluate |
+| Content type is not checked | The connector will not add `Content-Type` for you. When sending JSON, write it into `headers` yourself or the other side may parse the body as a form |
+| Errors do not block by default | 4XX and 5XX responses raise nothing unless `throw-http-error` is enabled |

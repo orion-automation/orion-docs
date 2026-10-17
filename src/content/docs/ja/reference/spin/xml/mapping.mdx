@@ -1,0 +1,74 @@
+---
+title: XML のオブジェクトマッピング
+description: SPIN の XML データ形式で、XML と Java オブジェクトを双方向にマッピングします。
+sidebar:
+  order: 5
+---
+
+## 1. マッピングの仕組み
+
+SPIN はマッピング機能を同じ流れるような API に統合しています。XML を Java オブジェクトへ直接マッピングでき、Java オブジェクトをそのまま XML へシリアライズできます。
+
+実際のシリアライズは JAXB が担います。Java クラスに JAXB アノテーションを付ければ要素名や名前空間を制御できますが、**アノテーションは必須ではありません**。付けない場合はクラス名とフィールド名から導出されます。
+
+## 2. XML から Java へ
+
+### 2.1 対象クラスを定義する
+
+```java
+@XmlRootElement(name = "customer", namespace = "http://camunda.org/test")
+public class Customer {
+
+  private String name;
+
+  @XmlElement(namespace = "http://camunda.org/test")
+  public String getName() {
+    return name;
+  }
+
+  public void setName(String name) {
+    this.name = name;
+  }
+}
+```
+
+`@XmlRootElement` がルート要素の名前と名前空間を、`@XmlElement` がフィールドの対応を宣言します。名前空間はペイロードと一致している必要があり、ずれていると例外ではなく空の結果になります。
+
+### 2.2 マッピングを実行する
+
+```java
+import static org.camunda.spin.Spin.XML;
+
+String xmlInput = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+    + "<customer xmlns=\"http://camunda.org/example\"><name>Kermit</name></customer>";
+
+Customer customer = XML(xmlInput).mapTo(Customer.class);
+```
+
+`mapTo` は完成したオブジェクトを返します。クエリや項目ごとの取り出しは不要です。
+
+## 3. Java から XML へ
+
+```java
+String xml = XML(customer).toString();
+```
+
+`XML(オブジェクト)` は Java オブジェクトを XML 要素として包みます。出力方法は [XML の書き出しとシリアライズ](/ja/reference/spin/xml/writing/) を参照してください。
+
+## 4. アノテーションと制約
+
+| 項目 | 説明 |
+| :--- | :--- |
+| アノテーションの要否 | 必須ではありません。付けない場合はクラス名とフィールド名から要素名を導出します |
+| 名前空間 | クラスのアノテーションとペイロードがずれていると値が取得できません |
+| null 値 | `null` のフィールドは既定では要素として出力されません |
+| コレクションのフィールド | 意図した入れ子構造にするには `@XmlElementWrapper` と `@XmlElement` の併用が必要です |
+| 型のサポート | JAXB の制約を受けます。引数なしのコンストラクタとアクセス可能な getter / setter が必要です |
+| 性能 | マッピングコンテキストはキャッシュされるため、同じ型を繰り返しマッピングしても再構築されません |
+
+JAXB のコンテキストやセキュリティ設定を差し替える場合は [XML 処理の設定](/ja/reference/spin/xml/configuring/) を参照してください。
+
+## 5. 関連ページ
+
+- マッピングせずノードを直接編集する：[XML の要素と属性の操作](/ja/reference/spin/xml/manipulating/)
+- JSON での同様のマッピング：[JSON のオブジェクトマッピング](/ja/reference/spin/json/mapping/)

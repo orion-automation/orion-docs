@@ -1,0 +1,201 @@
+---
+title: HTTP コネクタ
+description: HTTP コネクタのパラメータの取り決め、モデラーでの設定対応、基盤となる呼び出しインターフェース、エラーとレスポンスの扱い、利用上の制約。
+---
+
+## 1. 概要
+
+HTTP コネクタは、Java の委譲コードを書かずにプロセスから REST や HTTP のリクエストを直接送れるようにします。外部コンポーネントを持ち込まない場合、プロセスを外部 API につなぐ既定の手段です。
+
+コネクタはエンジン側で固定の識別子 `http-connector` を持ちます。エンジンはクラスパス上のコネクタ実装を走査し、この識別子に当たるものを取り出します。モデラーの「コネクタ ID」に入れる値もこれです。
+
+## 2. モデラーでの使い方
+
+HTTP コネクタは**サービスタスク**または**送信タスク**に載せます。画面上で設定した内容は、最終的にエンジンが実行時に評価する入力パラメータと出力パラメータの組になります。
+
+### 2.1 基本設定
+
+プロパティパネルで二つを宣言します。
+
+| プロパティ | 値 | 説明 |
+| :--- | :--- | :--- |
+| 実装 | コネクタ | これを選んだときだけ、コネクタの入力と出力の表が現れます |
+| コネクタ ID | `http-connector` | エンジンはこの識別子で実装を探します。書き間違えてもデプロイは失敗せず、実行時にコネクタが見つからなくなります |
+
+### 2.2 入力パラメータ
+
+入力パラメータはタスクの実行前に評価され、一つずつリクエストへ渡されます。
+
+| 名前 | 型 | 必須 | 説明 |
+| :--- | :--- | :--- | :--- |
+| `method` | 文字列 | はい | HTTP メソッド：`GET`、`POST`、`PUT`、`DELETE`、`PATCH`、`HEAD`、`OPTIONS`、`TRACE` |
+| `url` | 文字列 | はい | 送信先のアドレス。`${…}` 式に対応し、実行時にプロセス変数を組み込めます |
+| `headers` | マップ | いいえ | リクエストヘッダー。`Authorization`、`Content-Type`、`Accept` がよく使われます |
+| `payload` | テキストまたはスクリプト | いいえ | リクエスト本文。主に `POST` と `PUT` で使います。動的に組み立てる JSON は、型をスクリプトにして式やテンプレートで生成します |
+
+この四つ以外の入力パラメータ名は認識されません。クエリパラメータ専用の場所はなく、`https://example.com/orders?page=1&size=50` のように `url` へ組み込みます。固定部分はそのまま書き、プロセス変数から取る部分は `${…}` として実行時に置き換わります。
+
+### 2.3 出力パラメータ
+
+リクエストが終わると、レスポンスの内容はいったんコネクタの一時的なコンテキストに置かれ、プロセスには書き戻されません。後続の要素から使うには、出力パラメータで取り出してプロセス変数に名前を付ける必要があります。
+
+| 名前 | 型 | 説明 |
+| :--- | :--- | :--- |
+| `statusCode` | 文字列 | HTTP ステータスコード（`200`、`404` など）。結果による分岐で使います |
+| `response` | テキストまたはスクリプト | レスポンス本文。**文字列であり、オブジェクトではありません**。項目単位で読むには、まず JSON として解析します |
+| `headers` | マップ | レスポンスヘッダー。トークンの検証やキャッシュの方針の読み取りに使えます |
+
+出力パラメータは入力と向きが逆です。左が「どのプロセス変数に入れるか」、右が評価する式で、たとえば `statusCode` を `orderStatus` に入れます。項目を取り出すときは `S(response).prop("total")` のような JSON 式を使います。
+
+### 2.4 コネクタリソースとの関係
+
+設計モジュールのコネクタリソースが管理しているのは同じ呼び出しパラメータです。アドレス、メソッド、リクエストヘッダーのテンプレート、クエリパラメータ、リクエスト本文のテンプレート、レスポンスの項目。これをサービスタスクに載せると、その内容がここで説明した二つのパラメータ表に変換され、`url`、`headers`、`payload` に実行時のプロセス変数が入ります。
+
+つまり両者は別々の設定ではなく、一つの呼び出しプランの二つの見え方です。コネクタリソースは再利用の単位で、プロパティパネルのパラメータ表はそれが一つのタスクに定着した結果です。
+
+## 3. 基盤となる HTTP クライアント
+
+コネクタ自身は通信を実装しておらず、実際のリクエストは Apache HttpClient が送ります。そのため下位の設定もそのまま効きます。
+
+- 既定では HttpClient の標準設定を使い、対応する HTTP のシステムプロパティに従います。
+- エンジンは HttpClient 5.x を使い、パッケージ構成は `org.apache.hc.client5.*` と `org.apache.hc.core5.*` です。高レベルのコネクタインターフェースは互換を保ちますが、カスタム設定や拡張コードは 5.x のパッケージで書く必要があります。
+
+## 4. カスタム設定
+
+既定の設定では足りないとき——接続プールの大きさを指定したい、接続マネージャーを差し替えたい——は、コネクタコンフィギュレーターを実装して登録します。
+
+### 4.1 コンフィギュレーターを書く
+
+次の例は、独自の接続プールをコネクタに注入します。
+
+```java
+package com.example.connector;
+
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.camunda.connect.httpclient.HttpConnector;
+import org.camunda.connect.httpclient.impl.AbstractHttpConnector;
+import org.camunda.connect.spi.ConnectorConfigurator;
+
+public class HttpConnectorConfigurator implements ConnectorConfigurator<HttpConnector> {
+
+  public Class<HttpConnector> getConnectorClass() {
+    return HttpConnector.class;
+  }
+
+  public void configure(HttpConnector connector) {
+    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+    connectionManager.setDefaultMaxPerRoute(10);
+    connectionManager.setMaxTotal(200);
+
+    CloseableHttpClient client = HttpClients.custom()
+      .setConnectionManager(connectionManager)
+      .build();
+    ((AbstractHttpConnector) connector).setHttpClient(client);
+  }
+}
+```
+
+### 4.2 コンフィギュレーターを登録する
+
+エンジンは SPI でコンフィギュレーターを見つけます。プロジェクトのリソースディレクトリに `META-INF/services/org.camunda.connect.spi.ConnectorConfigurator` を作り、コンフィギュレータークラスの完全修飾名を書きます。
+
+```
+com.example.connector.HttpConnectorConfigurator
+```
+
+クラスパスに複数のコンフィギュレーターがある場合、エンジンは順に呼び出します。
+
+## 5. コネクタを直接呼び出す
+
+Java や独自コンポーネントからは、流れるように書けるインターフェースで直接リクエストを送れます。
+
+### 5.1 リクエストを作成する
+
+```java
+// 単純な GET
+http.createRequest()
+  .get()
+  .url("https://example.com/orders")
+  .execute();
+
+// 本文付きの POST
+http.createRequest()
+  .post()
+  .url("https://example.com/orders")
+  .contentType("text/plain")
+  .payload("Hello World!")
+  .execute();
+```
+
+### 5.2 リクエストヘッダーを追加する
+
+```java
+HttpResponse response = http.createRequest()
+  .get()
+  .header("Accept", "application/json")
+  .url("https://example.com/orders")
+  .execute();
+```
+
+## 6. エラー処理
+
+既定では、4XX や 5XX のレスポンスを受けてもコネクタは例外を投げません。リクエストはそのまま返り、ステータスコードは `statusCode` に残ります。プロセスを続けるかどうかは、後続のゲートウェイが判断します。
+
+失敗したときにその経路を止めたい場合は、設定項目 `throw-http-error` を `TRUE` にします。
+
+```java
+HttpResponse response = http.createRequest()
+  .get()
+  .configOption("throw-http-error", "TRUE")
+  .url("https://example.com/orders")
+  .execute();
+```
+
+同じ設定は、モデラーで入力パラメータ `throw-http-error` として与えることもできます。有効にすると失敗したレスポンスは例外になり、タスクに付けたエラー境界イベントが動きます。スクリプトで判定を書く必要はありません。
+
+## 7. レスポンス処理
+
+レスポンスオブジェクトは、ステータスコード、ヘッダー、本文の三つを持ちます。
+
+```java
+Integer statusCode = response.getStatusCode();
+String contentType = response.getHeader("Content-Type");
+String body = response.getResponse();
+```
+
+Java のコードでレスポンスを使い終えたら、`response.close()` を呼んで接続を解放する必要があります。プロセスでパラメータの対応付けを通して使う場合、解放はエンジンが行います。
+
+## 8. 汎用インターフェース
+
+流れるようなメソッドのほかに、名前でパラメータを渡す汎用インターフェースもあります。モデラーの入力・出力パラメータの表は、内部的にこのインターフェースを使っています。
+
+### 8.1 リクエストパラメータを設定する
+
+```java
+HttpRequest request = http.createRequest();
+request.setRequestParameter("method", "GET");
+request.setRequestParameter("url", "https://example.com/orders");
+request.setRequestParameter("payload", "hello world!");
+```
+
+### 8.2 レスポンスパラメータを読み取る
+
+```java
+response.getResponseParameter("statusCode");
+response.getResponseParameter("headers");
+response.getResponseParameter("response");
+```
+
+## 9. 制約と前提
+
+| 制約 | 説明 |
+| :--- | :--- |
+| 入力パラメータは四つだけ | `method`、`url`、`headers`、`payload`。クエリ、タイムアウト、再試行の専用パラメータはなく、アドレスやヘッダー、またはタスクの外側のプロセスで解決します |
+| サービス基底 URL という考え方がない | コネクタは完全なアドレスしか受け取りません。環境ごとにホストを切り替えるには、`url` でプロセス変数を参照し、デプロイ時に同名の変数を用意します |
+| 相対アドレスには追加の変数が要る | コネクタリソースから作られた相対アドレスは `${baseUrl}` になるため、実行時に `baseUrl` というプロセス変数が無いとリクエストはそのまま失敗します |
+| 本文の値は常に文字列 | パラメータ表で与えた本文は文字列として送られます。数値や真偽値、入れ子の構造は自分でシリアライズします |
+| 項目単位の出力は JSON 解析に依存 | コネクタが返すのは本文の文字列だけです。項目単位で取り出すには JSON 解析が必要で、使えないと式の評価に失敗します |
+| 内容タイプは検査しない | コネクタが `Content-Type` を補うことはありません。JSON を送るときは自分で `headers` に書かないと、相手側がフォームとして解釈する可能性があります |
+| エラーは既定では止めない | `throw-http-error` を有効にしない限り、4XX と 5XX で例外は投げられません |

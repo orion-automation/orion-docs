@@ -503,3 +503,52 @@ a.orion-clickable-card:hover .card {
   background-color: #fee2e2 !important;
   color: #ef4444 !important;
 }
+
+/* ==========================================================================
+   正文表格：宽度不够时横向滚动，短列不再被压成一字一行
+   --------------------------------------------------------------------------
+   Starlight 默认给表格 `display:block; overflow:auto`，但没限制单元格的最小宽度，
+   于是「类型」「必填」这类短列会被压到只剩一个汉字的宽度，一个词竖着排成好几行，
+   整张表被行高撑高、看上去像排版坏了。
+
+   这里给每个单元格一个下限：放不下就让表格自己出横向滚动条，
+   而不是把内容挤成垂直文字。
+   ========================================================================== */
+.sl-markdown-content table:not(:where(.not-content *)) {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/*
+ * 单元格里的长标识符（完全限定类名、META-INF 路径）按原样保留：
+ * 它们会把表格撑宽、由表格自己横向滚动，而不是被拆成两截。
+ * 如果某张表因此把旁边的文字列挤得太窄，那是内容该拆表，不是样式该断词。
+ */
+.sl-markdown-content th:not(:where(.not-content *)),
+.sl-markdown-content td:not(:where(.not-content *)) {
+  /* 5rem 能放下 3~4 个汉字（含内边距），短列不会再被压成竖排 */
+  min-width: 5rem;
+}
+
+/* 出现横向滚动时给一条看得见的滚动条：macOS 的浮层滚动条平时不显示，
+   表格被裁掉一截容易被读成「内容丢了」。
+   ⚠️ 这里**不能**写 `scrollbar-width`：一旦它不是 auto，Chrome 会忽略
+   `::-webkit-scrollbar` 的样式，滚动条又变回默认的浮层样式。 */
+.sl-markdown-content table:not(:where(.not-content *))::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.sl-markdown-content table:not(:where(.not-content *))::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background-color: var(--sl-color-gray-4);
+}
+
+.sl-markdown-content table:not(:where(.not-content *))::-webkit-scrollbar-thumb:hover {
+  background-color: var(--sl-color-gray-3);
+}
+
+.sl-markdown-content table:not(:where(.not-content *))::-webkit-scrollbar-track {
+  background-color: transparent;
+}

@@ -1,0 +1,114 @@
+---
+title: XML のクエリ
+description: SPIN の XML オブジェクトに対して XPath 1.0 で要素・属性・文字列・数値・真偽値を問い合わせます。
+sidebar:
+  order: 4
+---
+
+## 1. クエリの種類
+
+`xPath(式)` はクエリオブジェクトを返すので、そこから必要な結果型を取り出します。XPath のバージョンは **1.0** で、2.0 の関数や構文は使えません。
+
+| 欲しい結果 | 呼び出し | 戻り値の型 |
+| :--- | :--- | :--- |
+| 単一の要素 | `xPath(...).element()` | `SpinXmlTreeElement` |
+| 要素のリスト | `xPath(...).elementList()` | `SpinList<SpinXmlTreeElement>` |
+| 単一の属性 | `xPath(...).attribute()` | `SpinXmlTreeAttribute` |
+| 属性のリスト | `xPath(...).attributeList()` | `SpinList<SpinXmlTreeAttribute>` |
+| 文字列 | `xPath(...).string()` | `String` |
+| 数値 | `xPath(...).number()` | `Double` |
+| 真偽値 | `xPath(...).bool()` | `Boolean` |
+
+### 1.1 要素を問い合わせる
+
+```java
+import static org.camunda.spin.Spin.XML;
+
+String xml = "<root><child><a>foo</a></child><child><a>bar</a></child></root>";
+
+SpinXmlTreeElement child = XML(xml).xPath("/root/child").element();
+```
+
+### 1.2 要素のリストを問い合わせる
+
+```java
+SpinList<SpinXmlTreeElement> elements = XML(xml).xPath("/root/child/a").elementList();
+```
+
+### 1.3 属性を問い合わせる
+
+```java
+String xml = "<root><child id=\"1\"><a>foo</a></child></root>";
+
+SpinXmlTreeAttribute attribute = XML(xml).xPath("/root/child/@id").attribute();
+String id = attribute.value();
+```
+
+### 1.4 属性のリストを問い合わせる
+
+```java
+SpinList<SpinXmlTreeAttribute> attributes = XML(xml).xPath("/root/child/a/@id").attributeList();
+```
+
+### 1.5 文字列・数値・真偽値を問い合わせる
+
+XPath が計算できる値は、要素を取り出してから変換する必要はありません。
+
+```java
+String value = XML(xml).xPath("string(/root/child/@id)").string();
+Double count = XML(xml).xPath("count(/root/child/a)").number();
+Boolean exists = XML(xml).xPath("boolean(/root/child)").bool();
+```
+
+## 2. 名前空間
+
+式で使うプレフィックスはクエリ側で宣言する必要があります。宣言しないと、名前空間を持つノードには一切一致しません。
+
+### 2.1 プレフィックスを 1 つ宣言する
+
+```java
+SpinXmlTreeElement element = XML(xml)
+    .xPath("/root/child")
+    .ns("t", "http://camunda.org")
+    .element();
+```
+
+### 2.2 複数のプレフィックスをまとめて宣言する
+
+```java
+Map<String, String> namespaces = new HashMap<>();
+namespaces.put("t", "http://camunda.org");
+namespaces.put("u", "http://camunda.org/other");
+
+SpinXmlTreeElement element = XML(xml).xPath("/t:root/u:child").ns(namespaces).element();
+```
+
+### 2.3 既定の名前空間には `DEFAULT` をプレフィックスに使う
+
+文書が既定の名前空間（`<root xmlns="...">`）を使っている場合も、式にはプレフィックスが必要です。SPIN では `DEFAULT` を使う約束になっています。
+
+```java
+String xml = "<root xmlns=\"http://camunda.org\"><child/></root>";
+
+SpinXmlTreeElement element = XML(xml)
+    .xPath("/DEFAULT:root/DEFAULT:child")
+    .ns("DEFAULT", "http://camunda.org")
+    .element();
+```
+
+プレフィックスを宣言せず `/root/child` と書くと空になります。既定の名前空間しか使わないペイロードで最も引っかかりやすい点です。
+
+## 3. 制約
+
+| 項目 | 説明 |
+| :--- | :--- |
+| XPath のバージョン | 1.0 のみ |
+| 単一結果 | `.element()` などは複数一致した場合に最初の 1 件だけを返します |
+| 空の結果 | 一致なしの場合は空のコレクションです。単一結果のメソッドは `null` を返すことがあるため、事前に確認してください |
+| プレフィックス | クエリ側で宣言が必要で、文書から自動推論されません |
+| 性能 | `xPath(...)` は毎回評価し直します。ループ内では結果をキャッシュしてください |
+
+## 4. 関連ページ
+
+- 取得したノードの変更：[XML の要素と属性の操作](/ja/reference/spin/xml/manipulating/)
+- JSON での同様のクエリ：[JSON のクエリ](/ja/reference/spin/json/querying/)

@@ -1,0 +1,135 @@
+---
+title: 扩展 SPIN
+description: 通过 SPI 注册自定义数据格式、配置内置数据格式的机制与步骤参考。
+sidebar:
+  order: 9
+---
+
+## 1. 两种扩展方式
+
+SPIN 开放了两个彼此独立的扩展点，都基于 Java 的 service loader 机制，不需要改动 SPIN 自身代码。
+
+| 想做的事 | 扩展点（SPI 接口） |
+| :--- | :--- |
+| 调整已有数据格式的行为（日期格式、序列化细节、安全选项等） | `org.camunda.spin.spi.DataFormatConfigurator` |
+| 新增一种数据格式（例如 YAML、Protobuf） | `org.camunda.spin.spi.DataFormat` + `org.camunda.spin.spi.DataFormatProvider` |
+
+两者注册方式相同：把实现类的全限定类名写进 `META-INF/services/` 下、以接口全名命名的文件。具体步骤见 [2.3 注册配置器](#23-注册配置器) 与 [3.3 注册提供者](#33-注册提供者)。
+
+两者的差别值得先分清：**配置器不改数据格式的种类，只改它内部用的组件**；**提供者会多出一种数据格式**，在流程里可以按名称选择。
+
+## 2. 配置已有数据格式
+
+### 2.1 配置器要做什么
+
+配置器声明「我能配置哪一类数据格式」，SPIN 在启动时把匹配的数据格式实例交给它，由它修改内部组件。
+
+具体能改什么取决于数据格式本身：
+
+| 数据格式 | 可替换的组件 | 参考 |
+| :--- | :--- | :--- |
+| JSON | `ObjectMapper` | [配置 JSON 处理](/reference/spin/json/configuring/) |
+| XML | `DocumentBuilderFactory`、`TransformerFactory`、`JAXBContext` | [配置 XML 处理](/reference/spin/xml/configuring/) |
+
+一个配置器可以同时服务多个数据格式实例——SPIN 会把所有匹配的实例都交给它。
+
+### 2.2 实现配置器
+
+实现 `org.camunda.spin.spi.DataFormatConfigurator`，给出目标数据格式的类，并在 `configure` 里做替换。
+
+```java
+package com.example.spin;
+
+import org.camunda.spin.impl.json.jackson.format.JacksonJsonDataFormat;
+import org.camunda.spin.spi.DataFormatConfigurator;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+public class JacksonConfigurator implements DataFormatConfigurator<JacksonJsonDataFormat> {
+
+  @Override
+  public Class<JacksonJsonDataFormat> getDataFormatClass() {
+    return JacksonJsonDataFormat.class;
+  }
+
+  @Override
+  public void configure(JacksonJsonDataFormat dataFormat) {
+    ObjectMapper objectMapper = new ObjectMapper();
+    // 在这里按需要配置 objectMapper
+    dataFormat.setObjectMapper(objectMapper);
+  }
+}
+```
+
+`getDataFormatClass()` 返回一个类即可，SPIN 会把该类**及其子类**的实例都交给这个配置器。
+
+### 2.3 注册配置器
+
+1. 实现 `org.camunda.spin.spi.DataFormatConfigurator`
+2. 把实现类的**全限定类名**写进 `META-INF/services/org.camunda.spin.spi.DataFormatConfigurator`
+3. 确保该实现所在的构件在 SPIN 的类加载器里可见
+
+文件内容就是一行类名：
+
+```text
+com.example.spin.JacksonConfigurator
+```
+
+多个配置器就写多行。文件放在 `src/main/resources/META-INF/services/` 下，构建时会随 jar 一起打包。
+
+## 3. 提供自定义数据格式
+
+### 3.1 实现数据格式
+
+自定义数据格式实现 `org.camunda.spin.spi.DataFormat` 接口，负责把字符串或字符流解析成 SPIN 对象，以及反向输出。
+
+### 3.2 实现提供者
+
+再实现 `org.camunda.spin.spi.DataFormatProvider`，由它把数据格式交给 SPIN。SPIN 在运行期通过 service loader 查找所有提供者实现。
+
+### 3.3 注册提供者
+
+1. 实现 `org.camunda.spin.spi.DataFormat`
+2. 实现 `org.camunda.spin.spi.DataFormatProvider`
+3. 把提供者的全限定类名写进 `META-INF/services/org.camunda.spin.spi.DataFormatProvider`
+4. 确保该构件在 SPIN 的类加载器里可见
+
+### 3.4 验证是否注册成功
+
+| 调用 | 作用 |
+| :--- | :--- |
+| `DataFormats.getAvailableDataFormats()` | 列出全部可用数据格式，自定义的会与内置的一起返回 |
+| `DataFormats.getDataFormat(名称)` | 按名称取得指定的数据格式 |
+
+自定义数据格式没有出现在 `getAvailableDataFormats()` 里，绝大多数情况是前三步中漏了一步：文件名写错、类名不是全限定名、或构件不在类加载器可见范围内。
+
+## 4. 加载与配置
+
+数据格式在**加载阶段**被实例化并配置，之后 SPIN 会缓存实例。
+
+加载时可以用一个 `Map` 传入配置项：
+
+```java
+Map<String, Object> configurationOptions = new HashMap<>();
+// 键值取决于具体的数据格式实现
+DataFormats.loadDataFormats(classloader, configurationOptions);
+```
+
+这意味着两件事：
+
+* 配置只在加载时生效一次，**运行期修改不会重新应用**
+* 改配置等于改数据格式实例，要重新加载
+
+## 5. 约束
+
+| 项 | 说明 |
+| :--- | :--- |
+| 类加载器可见性 | 实现类必须在 SPIN 的类加载器里，否则 service loader 找不到 |
+| 配置文件位置 | 必须是 `META-INF/services/` 下的约定文件名，拼错即静默失效 |
+| 类名格式 | 必须是全限定类名，不能写简单类名 |
+| 配置器的粒度 | 按类匹配，一个配置器影响该类的所有实例 |
+| 失败表现 | 找不到配置器不会报错，只是配置没生效——排查时优先确认注册文件 |
+
+## 6. 相关文档
+
+- JSON 的配置项：见 [配置 JSON 处理](/reference/spin/json/configuring/)
+- XML 的配置项：见 [配置 XML 处理](/reference/spin/xml/configuring/)

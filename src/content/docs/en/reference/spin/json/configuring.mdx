@@ -1,0 +1,97 @@
+---
+title: Configuring JSON handling
+description: Replace the object mapper behind JSON handling to adjust parsing, serialization and mapping behavior.
+sidebar:
+  order: 5
+---
+
+## 1. Overview
+
+SPIN uses Jackson to parse, serialize and map JSON. The JSON data format holds an instance of `com.fasterxml.jackson.databind.ObjectMapper`, and that instance decides strictness, how unknown fields are treated, output formatting and more.
+
+Changing that behavior means writing a data format configurator and replacing the object mapper inside it.
+
+| Item | Value |
+| :--- | :--- |
+| Data format class | `org.camunda.spin.impl.json.jackson.format.JacksonJsonDataFormat` |
+| Configurator interface | `org.camunda.spin.spi.DataFormatConfigurator` |
+| Registration file | `META-INF/services/org.camunda.spin.spi.DataFormatConfigurator` |
+| Object being replaced | `com.fasterxml.jackson.databind.ObjectMapper` |
+
+## 2. When it is needed
+
+| Situation | Adjustment |
+| :--- | :--- |
+| Payloads carry undeclared fields | Turn off fail-on-unknown so mapping onto a Java object does not throw |
+| Date formats vary | Set a date format and time zone on the mapper |
+| Non-strict JSON has to be tolerated | Relax the parsing features |
+| Output should be readable by people | Enable indented output |
+| Certain fields have to be ignored | Configure the ignore rules |
+
+## 3. Writing a configurator
+
+A configurator answers two questions: which data format it takes over, and what it changes. Implement `DataFormatConfigurator`, whose two methods map to those questions.
+
+```java
+package com.example.spin;
+
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import org.camunda.spin.impl.json.jackson.format.JacksonJsonDataFormat;
+import org.camunda.spin.spi.DataFormatConfigurator;
+
+public class JsonDataFormatConfigurator
+    implements DataFormatConfigurator<JacksonJsonDataFormat> {
+
+  public Class<JacksonJsonDataFormat> getDataFormatClass() {
+    return JacksonJsonDataFormat.class;
+  }
+
+  public void configure(JacksonJsonDataFormat dataFormat) {
+    ObjectMapper mapper = new ObjectMapper();
+    // extra fields in the payload no longer fail the mapping
+    mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    // serialize with indentation so variables are readable in the variable view
+    mapper.enable(SerializationFeature.INDENT_OUTPUT);
+
+    dataFormat.setObjectMapper(mapper);
+  }
+}
+```
+
+`setObjectMapper` replaces the mapper wholesale rather than layering settings on top of it. Anything the default mapper supplied, such as date formats or registered modules, is not inherited and has to be set again on the new instance.
+
+## 4. Common settings
+
+| Setting | Effect |
+| :--- | :--- |
+| `FAIL_ON_UNKNOWN_PROPERTIES` | Whether deserialization fails on an unknown field. On by default; turning it off tolerates fields the other side adds |
+| `INDENT_OUTPUT` | Whether serialized output is indented. Readability only, no change in meaning |
+| `WRITE_DATES_AS_TIMESTAMPS` | Whether dates are written as timestamps. Turning it off writes ISO 8601 strings |
+| `ACCEPT_SINGLE_VALUE_AS_ARRAY` | Whether a single value may be read as a one-element array |
+| `DateFormat` | The format and time zone used to parse and write dates |
+| `PropertyNamingStrategy` | The naming rule between Java fields and JSON keys, such as snake case to camel case |
+
+The settings come from Jackson; its documentation is the authority on the full list.
+
+## 5. Registering a configurator
+
+Configurators are discovered through SPI. Add a file named `META-INF/services/org.camunda.spin.spi.DataFormatConfigurator` under the project's resources directory and write the fully qualified class name into it:
+
+```
+com.example.spin.JsonDataFormatConfigurator
+```
+
+When several configurators are on the classpath, the engine calls all of them on the same data format, and the last mapper set wins. With more than one configurator present, confirm their order does not let one overwrite another.
+
+## 6. Scope and constraints
+
+| Item | Description |
+| :--- | :--- |
+| Scope | JSON handling for every process on the engine, regardless of process or app |
+| Effect on stored data | Only later parsing and serialization change. Variables already persisted are not rewritten; reading them back uses the new configuration |
+| Cost of relaxing strictness | With the unknown-field check off, a misspelled field name no longer raises anything; it is silently ignored |
+| Cost of indented output | Output grows, so history and variable tables take more space |
+| Replacement, not layering | `setObjectMapper` swaps the whole mapper; defaults have to be declared again |
+| XML is unaffected | XML handling has its own data format and configurator |

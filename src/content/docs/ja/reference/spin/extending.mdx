@@ -1,0 +1,135 @@
+---
+title: SPIN の拡張
+description: SPIN の SPI を使って、独自データ形式の登録と組み込みデータ形式の設定を行います。
+sidebar:
+  order: 9
+---
+
+## 1. 2 つの拡張方法
+
+SPIN は独立した 2 つの拡張点を公開しています。どちらも Java のサービスローダ機構を使うため、SPIN 本体に手を入れる必要はありません。
+
+| やりたいこと | 拡張点（SPI インタフェース） |
+| :--- | :--- |
+| 既存データ形式の挙動を調整する（日付形式、シリアライズの詳細、セキュリティ設定など） | `org.camunda.spin.spi.DataFormatConfigurator` |
+| 新しいデータ形式を追加する（YAML、Protobuf など） | `org.camunda.spin.spi.DataFormat` と `org.camunda.spin.spi.DataFormatProvider` |
+
+登録方法は両方とも同じです。実装クラスの完全修飾クラス名を、`META-INF/services/` 配下の、インタフェースの完全修飾名と同じ名前のファイルに書きます。手順は [2.3 コンフィグレータを登録する](#23-コンフィグレータを登録する) と [3.3 プロバイダを登録する](#33-プロバイダを登録する) を参照してください。
+
+この違いは先に押さえてください。**コンフィグレータは形式を増やさず、内部の部品を差し替えます**。**プロバイダは形式そのものを追加**し、プロセス上で名前から選択できるようになります。
+
+## 2. 既存データ形式の設定
+
+### 2.1 コンフィグレータの役割
+
+コンフィグレータは「どのデータ形式を設定できるか」を宣言します。起動時に SPIN が該当するデータ形式のインスタンスをすべて渡し、内部コンポーネントを差し替えます。
+
+何を差し替えられるかはデータ形式ごとに異なります。
+
+| データ形式 | 差し替え可能なコンポーネント | 参照 |
+| :--- | :--- | :--- |
+| JSON | `ObjectMapper` | [JSON 処理の設定](/ja/reference/spin/json/configuring/) |
+| XML | `DocumentBuilderFactory`、`TransformerFactory`、`JAXBContext` | [XML 処理の設定](/ja/reference/spin/xml/configuring/) |
+
+1 つのコンフィグレータが複数のデータ形式インスタンスを担当できます。SPIN は一致するすべてのインスタンスを渡します。
+
+### 2.2 コンフィグレータを実装する
+
+`org.camunda.spin.spi.DataFormatConfigurator` を実装し、対象のデータ形式クラスを返し、`configure` で差し替えを行います。
+
+```java
+package com.example.spin;
+
+import org.camunda.spin.impl.json.jackson.format.JacksonJsonDataFormat;
+import org.camunda.spin.spi.DataFormatConfigurator;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+public class JacksonConfigurator implements DataFormatConfigurator<JacksonJsonDataFormat> {
+
+  @Override
+  public Class<JacksonJsonDataFormat> getDataFormatClass() {
+    return JacksonJsonDataFormat.class;
+  }
+
+  @Override
+  public void configure(JacksonJsonDataFormat dataFormat) {
+    ObjectMapper objectMapper = new ObjectMapper();
+    // 必要に応じて objectMapper を設定する
+    dataFormat.setObjectMapper(objectMapper);
+  }
+}
+```
+
+`getDataFormatClass()` が返すのは 1 つのクラスです。SPIN はそのクラス**およびサブクラス**のインスタンスを渡します。
+
+### 2.3 コンフィグレータを登録する
+
+1. `org.camunda.spin.spi.DataFormatConfigurator` を実装する
+2. 実装クラスの**完全修飾クラス名**を `META-INF/services/org.camunda.spin.spi.DataFormatConfigurator` に書く
+3. 実装を含む成果物が SPIN のクラスローダから参照できるようにする
+
+ファイルの中身は 1 行 1 クラス名です。
+
+```text
+com.example.spin.JacksonConfigurator
+```
+
+複数ある場合は行を増やします。`src/main/resources/META-INF/services/` に置けば jar に同梱されます。
+
+## 3. 独自データ形式の提供
+
+### 3.1 データ形式を実装する
+
+独自データ形式は `org.camunda.spin.spi.DataFormat` インタフェースを実装します。文字列や文字ストリームを SPIN オブジェクトへ解析し、逆に書き出す役割です。
+
+### 3.2 プロバイダを実装する
+
+続いて `org.camunda.spin.spi.DataFormatProvider` を実装し、データ形式を SPIN に引き渡します。SPIN は実行時にサービスローダでプロバイダ実装を探します。
+
+### 3.3 プロバイダを登録する
+
+1. `org.camunda.spin.spi.DataFormat` を実装する
+2. `org.camunda.spin.spi.DataFormatProvider` を実装する
+3. プロバイダの完全修飾クラス名を `META-INF/services/org.camunda.spin.spi.DataFormatProvider` に書く
+4. その成果物が SPIN のクラスローダから参照できるようにする
+
+### 3.4 登録できたか確認する
+
+| 呼び出し | 用途 |
+| :--- | :--- |
+| `DataFormats.getAvailableDataFormats()` | 利用可能なデータ形式を一覧する。独自形式も組み込みと並んで返ります |
+| `DataFormats.getDataFormat(名前)` | 名前を指定してデータ形式を取得する |
+
+独自データ形式が `getAvailableDataFormats()` に出てこない場合、ほぼ例外なく最初の 3 ステップのいずれかです。ファイル名の誤り、単純クラス名のまま書いてしまった、成果物がクラスローダの範囲外にある、のいずれかを見直してください。
+
+## 4. 読み込みと設定
+
+データ形式は**読み込み時**にインスタンス化され設定されます。その後 SPIN がインスタンスをキャッシュします。
+
+読み込み時に `Map` で設定項目を渡せます。
+
+```java
+Map<String, Object> configurationOptions = new HashMap<>();
+// キーと値は具体的なデータ形式の実装に依存します
+DataFormats.loadDataFormats(classloader, configurationOptions);
+```
+
+ここから 2 つの帰結があります。
+
+* 設定は読み込み時に一度だけ適用され、**実行中の変更は再適用されません**
+* 設定を変えることはデータ形式インスタンスを変えることなので、読み込み直しが必要です
+
+## 5. 制約
+
+| 項目 | 説明 |
+| :--- | :--- |
+| クラスローダの可視性 | 実装クラスが SPIN のクラスローダから見えないと、サービスローダは発見できません |
+| 設定ファイルの場所 | `META-INF/services/` 配下の取り決められたファイル名が必須です。誤ると無言で無効になります |
+| クラス名の形式 | 完全修飾クラス名のみ有効です。単純クラス名では動作しません |
+| コンフィグレータの粒度 | クラス単位で一致するため、1 つのコンフィグレータがそのクラスの全インスタンスに影響します |
+| 失敗時の挙動 | コンフィグレータが見つからなくてもエラーにはならず、設定が効かないだけです。まず登録ファイルを確認してください |
+
+## 6. 関連ページ
+
+- JSON の設定項目：[JSON 処理の設定](/ja/reference/spin/json/configuring/)
+- XML の設定項目：[XML 処理の設定](/ja/reference/spin/xml/configuring/)

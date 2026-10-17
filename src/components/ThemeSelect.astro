@@ -228,6 +228,10 @@ const options = [
 		background-color: #ffffff;
 		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
 		animation: orion-theme-in 0.1s ease-out;
+		/* 记录之间留出缝：选项本身是圆角块，紧贴时选中底色与悬浮底色会连成一片 */
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
 	}
 
 	:global([data-theme='dark']) .orion-theme__panel {

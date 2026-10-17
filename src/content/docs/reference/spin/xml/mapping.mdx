@@ -1,0 +1,74 @@
+---
+title: XML 对象映射
+description: SPIN 数据格式在 XML 与 Java 对象之间双向映射的接口与注解参考。
+sidebar:
+  order: 5
+---
+
+## 1. 映射模型
+
+SPIN 把映射能力并入同一套链式接口：XML 可以直接映射成 Java 对象，Java 对象也可以直接序列化成 XML。
+
+底层的序列化由 JAXB 完成。可以在 Java 类上加 JAXB 注解来控制字段名、命名空间等细节，但**注解不是必需的**——不加注解时按字段名与类名推导。
+
+## 2. XML 转 Java
+
+### 2.1 定义目标类
+
+```java
+@XmlRootElement(name = "customer", namespace = "http://camunda.org/test")
+public class Customer {
+
+  private String name;
+
+  @XmlElement(namespace = "http://camunda.org/test")
+  public String getName() {
+    return name;
+  }
+
+  public void setName(String name) {
+    this.name = name;
+  }
+}
+```
+
+`@XmlRootElement` 声明根元素名称与命名空间，`@XmlElement` 声明字段对应的元素。命名空间必须与报文一致，否则映射结果为空。
+
+### 2.2 执行映射
+
+```java
+import static org.camunda.spin.Spin.XML;
+
+String xmlInput = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+    + "<customer xmlns=\"http://camunda.org/example\"><name>Kermit</name></customer>";
+
+Customer customer = XML(xmlInput).mapTo(Customer.class);
+```
+
+`mapTo` 直接给出结果对象，不需要先做查询或逐个取值。
+
+## 3. Java 转 XML
+
+```java
+String xml = XML(customer).toString();
+```
+
+`XML(对象)` 把 Java 对象包装成 XML 元素，再用 [写入与序列化 XML](/reference/spin/xml/writing/) 里介绍的方法输出。
+
+## 4. 注解与约束
+
+| 项 | 说明 |
+| :--- | :--- |
+| 注解是否必需 | 不是；不加注解时按类名与字段名推导元素名 |
+| 命名空间 | 类的注解与报文命名空间不一致时取不到值 |
+| 空值 | 值为 `null` 的字段默认不输出对应元素 |
+| 集合字段 | 需要写成 `@XmlElementWrapper` + `@XmlElement` 才能得到预期的嵌套结构 |
+| 类型支持 | 受 JAXB 约束，需要无参构造器与可访问的读写方法 |
+| 性能 | 映射上下文会被缓存，频繁映射同一类型不会重复构建 |
+
+需要替换 JAXB 的上下文或安全设置时，见 [配置 XML 处理](/reference/spin/xml/configuring/)。
+
+## 5. 相关文档
+
+- 不做映射、直接改节点：见 [操作 XML 元素与属性](/reference/spin/xml/manipulating/)
+- JSON 的同类映射：见 [JSON 对象映射](/reference/spin/json/mapping/)

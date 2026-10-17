@@ -1,0 +1,156 @@
+---
+title: XML の要素と属性の操作
+description: SPIN の XML データ形式で、属性と子要素の参照・設定・削除、およびテキスト内容の変更を行います。
+sidebar:
+  order: 2
+---
+
+## 1. 属性
+
+### 1.1 属性の有無を確認する
+
+| メソッド | 説明 |
+| :--- | :--- |
+| `hasAttr(name)` | 名前空間を持たない同名の属性があるか |
+| `hasAttrNs(uri, name)` | 指定した名前空間に同名の属性があるか |
+
+```java
+import static org.camunda.spin.Spin.XML;
+
+String xml = "<order xmlns:cam=\"http://example.com\" id=\"order1\" cam:name=\"name\" />";
+
+XML(xml).hasAttr("id");                                   // true
+XML(xml).hasAttrNs("http://example.com", "name");         // true
+```
+
+### 1.2 属性を取得する
+
+`attr(name)` は属性オブジェクトを返すので、`value()` で値を取り出します。名前空間付きの属性には `attrNs(uri, name)` を使います。
+
+```java
+SpinXmlAttribute attribute = XML(xml).attr("id");
+String id = attribute.value();
+```
+
+`hasAttrNs(uri, "name")` と `attr("name")` は別物です。前者は名前空間を考慮し、後者は名前空間を持たない属性だけを対象にします。
+
+### 1.3 属性を列挙する
+
+| メソッド | 戻り値 |
+| :--- | :--- |
+| `attrs()` | すべての属性 |
+| `attrs(uri)` | 指定した名前空間の属性 |
+| `attrNames()` | すべての属性名 |
+| `attrNames(uri)` | 指定した名前空間の属性名 |
+
+### 1.4 属性を設定する
+
+要素に設定する方法と、属性オブジェクトに設定する方法は等価です。
+
+```java
+XML(xml).attr("id", "newId");
+
+SpinXmlAttribute attribute = XML(xml).attr("id");
+attribute.value("newId");
+```
+
+名前空間付きの場合は `attrNs(uri, name, value)` を使います。
+
+### 1.5 属性を削除する
+
+```java
+SpinXmlDomElement element = XML(xml).removeAttr("id");
+```
+
+属性オブジェクトの `remove()` でも同じで、操作対象の要素が返ります。名前空間付きの場合は `removeAttrNs(uri, name)` です。
+
+## 2. テキスト内容
+
+`textContent()` で要素のテキストを取得し、引数を渡すと書き込みます。
+
+```java
+SpinXmlDomElement element = XML("<customer>Foo</customer>");
+String text = element.textContent();   // "Foo"
+element.textContent("Bar");
+```
+
+`textContent()` は子要素内のテキストも含めて連結した値を返します。直接のテキストだけが必要な場合は、子要素かクエリで位置を特定してください。
+
+## 3. 子要素
+
+### 3.1 子要素を取得する
+
+| メソッド | 戻り値 |
+| :--- | :--- |
+| `childElement(name)` | 最初の同名の子要素 |
+| `childElement(uri, name)` | 指定した名前空間で最初の同名の子要素 |
+| `childElements(name)` | 同名の子要素すべて |
+| `childElements(uri, name)` | 指定した名前空間で同名の子要素すべて |
+
+```java
+String xml = "<order xmlns:cam=\"http://example.com\">"
+    + "<date/><cam:due/><item/><item/></order>";
+
+SpinXmlDomElement date = XML(xml).childElement("date");
+SpinXmlDomElement due = XML(xml).childElement("http://example.com", "due");
+SpinCollection<SpinXmlDomElement> items = XML(xml).childElements("item");
+```
+
+`childElement` は直接の子要素だけを対象とし、階層を下りません。階層や条件でノードを選ぶ場合は [XPath クエリ](/ja/reference/spin/xml/querying/) を使います。
+
+### 3.2 子要素を追加する
+
+`append` は 1 つ以上の要素を受け取ります。
+
+```java
+SpinXmlTreeElement root = XML("<root/>");
+root.append(XML("<child/>"), XML("<child/>"));
+```
+
+引数の要素はその親の下に置ける必要があります。すでに別の場所に属している要素は、先に切り離すか複製してください。
+
+### 3.3 子要素を削除する
+
+`remove` は 1 つ以上の子要素を受け取ります。
+
+```java
+SpinXmlTreeElement root = XML("<root><child/><child/><child/></root>");
+root.remove(root.childElements("child"));
+```
+
+### 3.4 要素を置き換える
+
+| メソッド | 動作 |
+| :--- | :--- |
+| `replaceChild(旧要素, 新要素)` | 親要素から見て子要素を置き換える |
+| `replace(新要素)` | 要素自身の位置で自分を置き換える |
+
+```java
+SpinXmlTreeElement root = XML("<root><date/><order/></root>");
+root.replaceChild(root.childElement("date"), XML("<child/>"));
+root.childElement("order").replace(XML("<child/>"));
+```
+
+どちらも置き換え後の要素を返し、元の要素はツリーから外れます。
+
+## 4. スクリプト言語での操作
+
+スクリプト言語でもメソッド名と意味は同じです。属性値の取得だけ `.value()` が 1 つ増えます。
+
+```python
+xml = '<order id="1231"><item id="1"/></order>'
+
+assert S(xml).hasAttr('id')
+order_id = S(xml).attr('id').value()
+
+item_id = S(xml).childElement('item').attr('id').value()
+```
+
+## 5. 制約
+
+| 項目 | 説明 |
+| :--- | :--- |
+| メソッドの混用不可 | 属性用メソッドは要素にのみ、`value()` は属性にのみ存在します |
+| 名前空間は明示が必要 | `Ns` なしのメソッドは名前空間付きの名前に一致しません |
+| 変更はその場で反映 | 操作後も同じツリーが返るため、再解析は不要です |
+| メモリ内のみ | 変更はプロセス変数へ自動的に書き戻されません |

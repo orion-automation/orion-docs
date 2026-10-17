@@ -1,0 +1,333 @@
+---
+title: BPMN modeler interface
+description: Reference for the interface regions, toolbar, element palette, properties panel and overlays of the ORION BPMN modeler.
+---
+
+## 1. Description
+
+The BPMN modeler is the workspace where you draw a business process inside the Build module. You open it from the resource list of a business app.
+
+The interface has four parts: the file tree of the current app on the left, the canvas in the middle, the toolbar in the top-right corner of the canvas, and the properties panel on the right once an element is selected. Edits are stored back into the current resource as a BPMN 2.0 model.
+
+The modeler offers two view modes. Both work on the same model, save exactly the same content, and differ only in which actions they expose.
+
+| Mode | Intended for | What it exposes |
+| :--- | :--- | :--- |
+| Designer view | Business designers | Orchestration and form actions; deployment and model source are hidden |
+| Developer view | Developers and implementation engineers | Every action |
+
+Switching modes does not reload the editor. Unsaved changes and undo history are kept.
+
+## 2. Interface layout
+
+| Region | Position | Contents |
+| :--- | :--- | :--- |
+| File tree | Left | Every design resource in the current business app |
+| Canvas | Center | Shapes, connections and lanes; quick actions appear next to the selected element |
+| Element palette | Top-left of the canvas | Shortcuts for creating common elements |
+| Toolbar | Top-right of the canvas | Saving, view controls, validation and simulation, panel toggles, delivery actions |
+| Properties panel | Right of the canvas | Every setting of the selected element |
+| Process document and model source | Over the canvas | The process documentation and the model source |
+| AI Assistant | Right of the canvas | A conversation tied to the current process |
+
+The toolbar and the properties panel stay fixed inside the canvas area and do not scroll with the content. The properties panel sits below the toolbar, so tooltips and drop-down menus opened from the toolbar are never covered by it.
+
+## 3. Toolbar
+
+From left to right the toolbar has seven groups separated by vertical dividers, always in the same order.
+
+### 3.1 Versions and saving
+
+| Control | Description |
+| :--- | :--- |
+| Current online version | Shows the version this edit is based on. Not shown until the resource has been saved to the server |
+| Save | Writes the canvas to the current version. The button is highlighted while there are unsaved changes and shows a progress state while saving; it is unavailable when nothing changed |
+| Save as | Creates a new version from the current content. Changes are not required beforehand |
+| History | Opens the history panel, which holds the history on this device and the online versions. See [7.1 History](#71-history) |
+
+The shortcut for saving is `⌘S` / `Ctrl+S`. A single save submits the complete resource: the model and the process document are written together, never one without the other.
+
+### 3.2 Editing
+
+| Control | Description |
+| :--- | :--- |
+| Undo | Reverts the last edit. Whole-canvas replacements such as importing a file can be undone the same way |
+| Redo | Restores an undone step |
+
+The shortcuts are `⌘Z` / `⌘⇧Z`, or `Ctrl+Z` / `Ctrl+Shift+Z` on Windows, and behave exactly like the buttons.
+
+### 3.3 View
+
+| Control | Description |
+| :--- | :--- |
+| Zoom out | Steps the canvas out by a fixed increment |
+| Zoom level | Shows the current zoom level; display only |
+| Zoom in | Steps the canvas in by a fixed increment |
+| Fit to viewport | Fits the whole process into the visible area |
+| Fullscreen edit | Enlarges the editing area without changing the model. Highlighted while active |
+| Minimap | Shows an overview in a corner of the canvas so you can orient yourself in large diagrams. Highlighted while active |
+
+The zoom controls always appear as a set; they are never reduced to a single button.
+
+### 3.4 Validation and simulation
+
+| Control | Description |
+| :--- | :--- |
+| Compare differences | Opens the side-by-side comparison. See [7.4 Compare differences](#74-compare-differences). Shows a progress state while the baseline is being read |
+| Simulation | Enters token simulation, which is meant for following the path a process takes. Nothing is saved from this mode |
+
+Once simulation is on, the same group gains the following controls.
+
+| Control | Description |
+| :--- | :--- |
+| Play simulation / Pause simulation | Starts or pauses token movement |
+| Reset simulation | Clears the token state and returns to the start event |
+| Simulation Log | Expands the execution log, which records every element the token visits. Highlighted while open |
+
+### 3.5 Panels
+
+| Control | Description |
+| :--- | :--- |
+| Business architecture | Opens the editor for business domains and process groups. See [7.5 Business architecture](#75-business-architecture). The button is marked when values are already configured |
+| Model source | Views and edits the model as source. See [7.3 Model source](#73-model-source). Not offered in Designer view |
+| Properties | Opens or closes the properties panel on the right. Highlighted while open |
+
+### 3.6 Delivery
+
+| Control | Description |
+| :--- | :--- |
+| Import BPMN file | Picks a BPMN 2.0 file from your computer and replaces the whole canvas with it. No new resource is created, and the import leaves the editor in an unsaved state |
+| Export | Opens the export menu with PNG, SVG and BPMN formats, and lets you choose a light or dark color scheme for images |
+| Deploy | Sends the current canvas to the engine and creates a deployment record. See [7.9 Deploy](#79-deploy). Not offered in Designer view |
+
+The export color scheme follows the interface theme until you pick one yourself; the choice you make is kept and takes precedence over the theme. The BPMN format is unaffected by color.
+
+Deployment sends what the canvas holds at that moment, whether or not it has been saved.
+
+### 3.7 Document and AI
+
+| Control | Description |
+| :--- | :--- |
+| Process document | Opens the documentation for this process. See [7.2 Process document](#72-process-document). The document is created automatically the first time it is opened |
+| AI Assistant | Expands the conversation on the right. See [7.8 AI Assistant](#78-ai-assistant). It shares the same business context as the process document |
+
+### 3.8 When the window is narrow
+
+When there is not enough width, the toolbar moves controls into the More actions menu at the far right, one step at a time, until the whole toolbar fits again.
+
+1. Deploy
+2. Simulation, Compare differences
+3. Import, Export
+4. Minimap, Fullscreen edit
+5. Business architecture, Model source, Properties
+6. Fit to viewport, Zoom
+7. Undo, Redo
+
+| Property | Description |
+| :--- | :--- |
+| Always kept | Save, History, Process document, AI Assistant |
+| Menu order | Matches the toolbar from left to right, with dividers between groups |
+| Using the menu | Clicking an entry has the same effect as clicking the button in the toolbar |
+| Toggle entries | The menu shows their current state directly |
+| Very narrow windows | If the toolbar still does not fit after everything has been moved, it wraps onto several rows and never covers the element palette |
+
+### 3.9 How the view mode affects the toolbar
+
+| Control | Designer view | Developer view |
+| :--- | :--- | :--- |
+| Deploy | Not offered | Offered |
+| Model source | Not offered; an exit action is kept if the view is already open | Offered |
+| Everything else | Offered | Offered |
+
+Hiding controls by view mode and moving them away on narrow windows are two independent rules: the first means this mode does not need the action, the second means the current width cannot hold it.
+
+## 4. Element palette
+
+The element palette sits in the top-left corner of the canvas and is the starting point for creating common elements. Click an entry or drag it onto the canvas; while dragging, the drop position is highlighted.
+
+### 4.1 Designer view
+
+The palette lists entries in the following order.
+
+| Entry | Purpose |
+| :--- | :--- |
+| Hand tool | Pans the canvas without creating anything |
+| Start event | Entry point of a process |
+| Task | Basic unit of work |
+| Add element | Opens the element picker. See [4.3 Add element panel](#43-add-element-panel) |
+| Create agent task | Creates a task with the agent attributes already in place |
+| Pool/participant | Container that carries lanes and phases |
+| Exclusive gateway | Conditional branching |
+| End event | End point of a process |
+
+### 4.2 Developer view
+
+Developer view starts from the full set of elements and adds two entries on top: Add element and Create agent task.
+
+### 4.3 Add element panel
+
+The panel opens category by category, and the category can be switched at the top.
+
+| Category | Contents | When empty |
+| :--- | :--- | :--- |
+| Standard | Tasks, gateways, sub-processes and events; events are split into start, intermediate catch, intermediate throw, boundary and end | — |
+| Connectors | Connectors already configured in this app; picking one creates a service task bound to it | The app has no connectors yet |
+| Enhancements | Reserved category | No components available |
+
+| Behavior | Description |
+| :--- | :--- |
+| Hierarchy | Opens level by level; the title bar shows where you are, and every level can be left again |
+| Search | Searches across all categories and shows the path of each result; the category name is omitted when there is only one |
+| Switching category | Clears the current level and the search |
+| Long lists | Scroll inside the panel without covering the canvas |
+
+## 5. Properties panel
+
+The properties panel sits on the right side of the canvas, has a fixed width and caps itself as the canvas narrows.
+
+| Part | Description |
+| :--- | :--- |
+| Title bar | Reads Properties, followed by the language switch, collapse and close actions |
+| Language switch | Switches the language of property names inside the panel without changing the site language. Not shown when the interface language is English |
+| Collapse | Hides the contents and keeps the title bar; expand again at any time |
+| Close | Closes the whole panel, with the same effect as the Properties button in the toolbar |
+| Contents | Depends on the selected element and covers identity, people assignment, form resources, connector implementation, input and output mapping, listeners, extension properties and more |
+
+Resource options in the panel — forms, processes, decisions, connectors, business objects — come from what the current app already contains. When a kind of resource is empty, that option shows an empty state instead of disappearing.
+
+## 6. Canvas quick actions
+
+Selecting an element brings up actions for it on the canvas. Besides Change element, Delete and connecting elements, the following actions are available.
+
+| Action | Available on | Description |
+| :--- | :--- | :--- |
+| Set color | Any element | Sets the color of the element, saved as part of the model |
+| Node comments | Any element | Opens the comment panel for this element. See [7.7 Node comments](#77-node-comments) |
+| AI configuration | Element types with AI support | Opens the AI settings for that element; it does not appear on other elements |
+| Open properties | Any element | Opens the properties panel and moves to this element |
+| Form | User task | Moves to the form resource option in the properties panel |
+| Process | Call activity | Moves to the called process option in the properties panel |
+| Decision | Business rule task | Moves to the decision resource option in the properties panel |
+| Script | Script task | Opens the script editor when the language and type are both set; otherwise moves to whichever option is still missing in the properties panel |
+| Connector | Service task | Moves to the connector resource option in the properties panel |
+
+Connecting sits to the left of Change element; the two form one group.
+
+## 7. Overlays and views
+
+### 7.1 History
+
+The history panel shows two parts side by side; they come from different places and do different things.
+
+| Part | Source | What it records | What you can do |
+| :--- | :--- | :--- | :--- |
+| On this device | The current browser | Recorded automatically while you edit, or saved manually under a name | Load into the editor, rename, delete an entry, clear all |
+| Online versions | Versions already saved on the server | Created by every Save and Save as | Restore as the current version, rename, delete |
+
+Loading an entry from this device only changes what the editor holds; the server is untouched. After restoring an online version its content is loaded into the editor and later saves write into that version. Deleting the version you are editing switches the editor to the latest remaining one, and unsaved changes are lost.
+
+### 7.2 Process document
+
+| Property | Description |
+| :--- | :--- |
+| Format | Markdown |
+| Relationship to the model | Documentation belonging to the process; saved together with the model |
+| Opening | The document is created automatically if it does not exist yet, otherwise its content is shown right away |
+| Editing | Editing and preview modes can be switched; the table of contents is generated from the headings |
+| Unsaved state | A marker appears in the title while there are changes |
+| Saving | Shares the same save as the model; closing the document does not submit anything on its own |
+| Included assistant | A documentation AI assistant is built in, and conversations are kept per document |
+
+While the document view is open the canvas cannot be edited.
+
+### 7.3 Model source
+
+The model definition is shown as source over the canvas and can be edited directly. Leaving the view loads the content back onto the canvas, so the source and the diagram always describe the same model. Not offered in Designer view; if it is already open, the exit action remains.
+
+### 7.4 Compare differences
+
+Two columns side by side: the baseline on the left, the current canvas on the right. Both are read-only and can be panned and zoomed.
+
+| Baseline source | Description |
+| :--- | :--- |
+| Upload a file | Picks a BPMN file from your computer as the baseline; it is used for comparison only and leaves the canvas untouched |
+| On this device | Picks one of the entries saved locally |
+| Online versions | Picks one of the versions saved on the server |
+
+Differences fall into four kinds: added, removed, changed and layout only. Until a baseline is chosen you can return to the picker and choose another one.
+
+### 7.5 Business architecture
+
+Maintains where the process belongs in the business structure. This is resource metadata and is not written into the model itself.
+
+| Field | Description |
+| :--- | :--- |
+| Business domain | Can be picked from the process architecture catalogue or typed in directly |
+| Process group | Same as above |
+| Apply | Submits the change |
+
+The window lists maintainable objects process by process and explains when there is nothing to maintain in the file. When values are configured, the matching toolbar button is marked.
+
+### 7.6 Element document
+
+Opened from the quick actions, it explains what a single element is for and is saved together with the model. Unlike the process document it has no separate save: closing the drawer writes it back.
+
+| Field | Description |
+| :--- | :--- |
+| Element name | Taken from the element; reads No name when empty |
+| Element ID | The element identifier, read-only |
+| Body | Markdown; type `/` to insert headings, lists, tables and more |
+
+### 7.7 Node comments
+
+Opened from the quick actions, stored per element, and can be deleted one by one.
+
+| Behavior | Description |
+| :--- | :--- |
+| Send | `Enter` |
+| New line | `Shift+Enter` |
+| No comments yet | Reads No comments yet |
+| Position | Follows the selected element and moves with the view |
+
+### 7.8 AI Assistant
+
+Expands on the right side of the canvas; the canvas narrows accordingly and is never covered.
+
+| Property | Description |
+| :--- | :--- |
+| Width | Can be dragged |
+| Full width | A full-width mode is available; the width then adapts on its own and is no longer draggable |
+| Relationship to other assistants | Mutually exclusive with the process document assistant and the element assistant; only one is open at a time |
+| History | Kept separately for each resource |
+
+### 7.9 Deploy
+
+Sends the canvas to the engine and creates a deployment record. The submission rules match New deployment in the Run module.
+
+| Property | Description |
+| :--- | :--- |
+| What is sent | The canvas as it stands at that moment |
+| Visibility | Not offered in Designer view |
+| Afterwards | Once deployed, the process can be found in the Run module |
+
+## 8. Keyboard shortcuts
+
+| Shortcut | Scope | Behavior |
+| :--- | :--- | :--- |
+| `⌘S` / `Ctrl+S` | Business app page | Saves the current file |
+| `⌘Z` / `Ctrl+Z` | Canvas | Undo |
+| `⌘⇧Z` / `Ctrl+Shift+Z` | Canvas | Redo |
+| `Esc` | Overlays | Closes the open window, menu or editor |
+
+## 9. Behavior and constraints
+
+| Kind | Description |
+| :--- | :--- |
+| Required | A save submits the complete resource; the model and the process document are written together |
+| Required | Importing a BPMN file replaces everything and discards steps that could previously be undone; the import itself can be undone, which returns you to the state before it |
+| Required | Deployment sends the canvas as it stands, whether or not it has been saved |
+| Required | Designer view only removes visible actions; it changes neither the saved content nor the way saving works |
+| Not supported | Generating a public share link. Who can view a process is decided by the membership of the business app |
+| Not supported | Switching the canvas theme on its own. The canvas follows the light or dark interface theme, and the export color scheme is chosen in the export menu |
+| Note | Even fully collapsed the toolbar needs some width; on narrower canvases it wraps onto several rows |
+| Note | A resource that has never been saved to the server has no online versions, so neither the version label nor the online versions part appears |

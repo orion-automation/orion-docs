@@ -1,0 +1,53 @@
+---
+title: Writing and serializing JSON
+description: Interface reference for serializing JSON nodes into standard strings or writing them straight to a character stream.
+sidebar:
+  order: 2
+---
+
+## 1. Overview
+
+Once a JSON tree has been manipulated, SPIN can serialize the underlying `SpinJsonNode` back into standard JSON.
+
+At runtime the JSON data format writes object state either to a string or directly to a character stream. This is the last step in turning a processed business variable into structured output that an external system can consume or that can be persisted physically.
+
+## 2. Writing to a string
+
+This is the most direct form of serialization. Calling `.toString()` on a `SpinJsonNode` yields the standard JSON representation of that node and every nested child.
+
+### 2.1 Serializing a node
+
+In Java a manipulated node turns back into a string with no extra work:
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+// create or manipulate a JSON node
+SpinJsonNode jsonNode = JSON("{\"customer\": \"Kermit\"}");
+
+// serialize the node into a standard string
+String jsonString = jsonNode.toString();
+
+```
+
+## 3. Writing to a writer
+
+When JSON has to go straight into a file, a network response or another I/O channel, writing to a `java.io.Writer` is the standard approach.
+
+* **API**: `.writeToWriter(Writer writer)`. The engine pushes the serialized content into the given writer and returns that same writer for further use.
+
+### 3.1 Writing to a character stream
+
+The example below writes a node into a `StringWriter`. In real use the target can equally be a `FileWriter` or a `PrintWriter`.
+
+```java
+import static org.camunda.spin.Spin.JSON;
+import java.io.StringWriter;
+
+// create or manipulate a JSON node
+SpinJsonNode jsonNode = JSON("{\"customer\": \"Kermit\"}");
+
+// push the node into the given writer
+StringWriter writer = jsonNode.writeToWriter(new StringWriter());
+
+```

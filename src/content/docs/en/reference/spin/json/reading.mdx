@@ -1,0 +1,357 @@
+---
+title: Working with JSON data
+description: Interface reference for reading, extracting, setting and manipulating JSON objects and arrays with the SPIN data format.
+sidebar:
+  order: 1
+---
+
+## 1. Reading JSON data
+
+The SPIN data format reads and parses JSON from strings or character streams.
+
+### 1.1 Reading from a string
+
+In Java, the global static methods below turn a standard JSON string into an object the engine can work with.
+
+* **Declaring the format explicitly**: pass `json()` to the `S()` method to tell SPIN the payload is JSON.
+
+```java
+  import static org.camunda.spin.Spin.*;
+  import static org.camunda.spin.DataFormats.*;
+
+  SpinJsonNode json = S("{\"customer\": \"Kermit\"}", json());
+
+```
+
+* **The shortcut function**: parse with `JSON()` directly.
+```java
+import static org.camunda.spin.Spin.*;
+
+SpinJsonNode json = JSON("{\"customer\": \"Kermit\"}");
+
+```
+
+
+* **Primitive values**: a string that holds a JSON primitive is read as that primitive. `JSON("true")`, for example, returns a `SpinJsonNode` holding the boolean `true`.
+
+### 1.2 Reading from a reader
+
+SPIN reads JSON straight from a `java.io.Reader`:
+
+* **API**: `S(reader, json())` or `JSON(reader)`.
+* **Reading a file**:
+```java
+import static org.camunda.spin.Spin.*;
+
+FileInputStream fis = new FileInputStream("/tmp/customer.json");
+InputStreamReader reader = new InputStreamReader(fis, "utf-8");
+SpinJsonNode json = JSON(reader);
+
+```
+
+
+
+### 1.3 Reading from a script language
+
+Reading JSON in a script language such as JavaScript works the same way. Because script languages are dynamically typed, no format hint is needed; the engine detects it.
+
+* **JavaScript example**:
+```javascript
+var customer = S('{"customer": "Kermit"}');
+
+```
+
+
+
+## 2. Reading JSON properties
+
+To extract a specific property from the JSON tree, use `.prop("name")`. It returns a `SpinJsonNode`, from which the value is then read.
+
+### 2.1 Java example
+
+```java
+import static org.camunda.spin.Spin.*;
+
+SpinJsonNode json = JSON("{\"customer\": \"Kermit\"}");
+SpinJsonNode customerProperty = json.prop("customer");
+String customerName = customerProperty.stringValue();
+
+```
+
+### 2.2 JavaScript example
+
+```javascript
+var json = S('{"customer": "Kermit"}');
+var customerProperty = json.prop("customer");
+var customerName = customerProperty.value();
+
+```
+
+## 3. Value types and type checks
+
+SPIN provides several methods that convert a `SpinJsonNode` into a native Java type, each checking the type on the way.
+
+### 3.1 Extracting native values
+
+* **`value()`**: the Java equivalent of a String, Boolean, Number or null property. Calling it on an object or array throws.
+* **`stringValue()`**: the value as a Java String; throws when the value is not a String.
+* **`numberValue()`**: the value as a Java Number; throws when the value is not a Number.
+* **`boolValue()`**: the value as a Java Boolean; throws when the value is not a Boolean.
+
+### 3.2 Checking the node type
+
+These methods report the underlying type of the current node and all return a boolean:
+
+* `isObject()`
+* `hasProp()`
+* `isBoolean()`
+* `isNumber()`
+* `isString()`
+* `isNull()`
+* `isValue()`
+* `isArray()`
+* **JavaScript example**:
+```javascript
+var json = S('{"over18":false}');
+json.prop('over18').isBoolean() // returns true
+
+```
+
+
+
+## 4. Fetching an array of data
+
+When a property holds an array, every element under that node can be extracted.
+
+### 4.1 Java example
+
+`.elements()` turns the array into a `SpinList`:
+
+```java
+import static org.camunda.spin.Spin.*;
+
+SpinJsonNode json = JSON("{\"customer\": [\"Kermit\", \"Waldo\"]}");
+SpinJsonNode customerProperty = json.prop("customer");
+SpinList customers = customerProperty.elements();
+
+SpinJsonNode customer = customers.get(0);
+String customerName = customer.stringValue();
+
+```
+
+### 4.2 JavaScript example
+
+```javascript
+var json = S('{"customer": ["Kermit", "Waldo"]}');
+var customerProperty = json.prop("customer");
+
+var customers = customerProperty.elements();
+var customer = customers.get(0);
+var customerName = customer.value();
+
+```
+
+## 5. Fetching field names
+
+`.fieldNames()` returns the names of every child node and property of a node.
+
+### 5.1 Java example
+
+```java
+import static org.camunda.spin.Spin.*;
+
+SpinJsonNode json = JSON("{\"customer\": [\"Kermit\", \"Waldo\"]}");
+ArrayList fieldNames = json.fieldNames();
+String fieldName1 = fieldNames.get(0);
+
+```
+
+### 5.2 JavaScript example
+
+```javascript
+var json = S('{"customer": ["Kermit", "Waldo"]}');
+var fieldNames = json.fieldNames();
+var fieldName1 = fieldNames.get(0);
+
+```
+
+## 6. Setting JSON properties
+
+`.prop("name", object)` sets or updates a property of a JSON node.
+
+### 6.1 Simple types
+
+* **String**: `.prop("name", "Waldo")`
+* **Integer**: `.prop("age", 42)`
+* **Long**: `.prop("period", 4200000000)`
+* **Float**: `.prop("price", 42.00)`
+* **Boolean**: `.prop("active", true)`
+
+### 6.2 Container types
+
+Arrays and objects can be passed as well.
+
+* **Setting an array**:
+* **Java**:
+```java
+SpinJsonNode json = JSON("{\"customer\": [\"Kermit\", \"Waldo\"]}");
+ArrayList<Object> list = new ArrayList<Object>();
+list.add("new entry");
+list.add("new entry2");
+json.prop("new_array", list);
+
+```
+
+
+* **JavaScript**:
+```javascript
+var json = S('{"customer": ["Kermit", "Waldo"]}');
+var list = ["new entry", "new entry2"];
+json.prop("new_array", list);
+
+```
+
+
+
+
+* **Setting an object**:
+* **Java**:
+```java
+SpinJsonNode json = JSON("{\"customer\": [\"Kermit\", \"Waldo\"]}");
+Map<String, Object> object = new HashMap<String, Object>();
+object.put("new_entry", 42);
+object.put("new_entry2", "Yeah!");
+json.prop("new_object", object);
+
+```
+
+
+* **JavaScript**:
+```javascript
+var json = S('{"customer": ["Kermit", "Waldo"]}');
+var object = {
+  "new_entry": 1,
+  "new_entry2": "Yeah!"
+};
+json.prop("new_array", object);
+
+```
+
+
+
+
+
+## 7. Removing JSON properties
+
+Two forms of `deleteProp` remove properties from a JSON object:
+
+* `.deleteProp("name")`: removes the single property with that name.
+* `.deleteProp(<list of names>)`: removes one or more properties listed by name.
+
+### 7.1 Java example
+
+```java
+SpinJsonNode json = JSON("{\"customer\": \"Kermit\", \"language\": \"en\"}");
+List<String> listOfNames = new ArrayList<String>();
+listOfNames.add("customer");
+listOfNames.add("language");
+
+// removes only the customer property
+json.deleteProp("customer");
+
+// removes the customer and language properties
+json.deleteProp(listOfNames);
+
+```
+
+### 7.2 JavaScript example
+
+```javascript
+var json = S('{"customer": ["Kermit", "Waldo"], "language": "en"}');
+var list = ["customer", "en"];
+
+// removes only the customer property
+json.deleteProp("customer");
+
+// removes the customer and language properties
+json.deleteProp(list);
+
+```
+
+## 8. Working with JSON arrays
+
+A JSON array represents a list of objects. SPIN offers the following methods for working with those lists.
+
+### 8.1 Array API
+
+* `.indexOf(<object>)`: the index of the first occurrence.
+* `.lastIndexOf(<object>)`: the index of the last occurrence.
+* `.append(<object>)`: appends an object to the end of the list.
+* `.insertAt(<index>, <object>)`: inserts an object at a given index.
+* `.insertBefore(<search object>, <object>)`: inserts a new object before the first occurrence of the search object.
+* `.insertAfter(<search object>, <object>)`: inserts a new object after the first occurrence of the search object.
+* `.remove(<object>)`: removes the first occurrence of the object.
+* `.removeLast(<object>)`: removes the last occurrence of the object.
+* `.removeAt(<index>)`: removes the entry at the given index.
+
+### 8.2 Example 1: finding indexes
+
+Both examples work on the array `{"test-array" : ["testdata1","testdata2",1,2,true,1,false,1]}`.
+
+* **Java**:
+```java
+SpinJsonNode json = JSON("{\"test-array\" : [\"testdata1\",\"testdata2\",1,2,true,1,false,1]}");
+SpinJsonNode list = json.prop("test-array");
+
+Integer i = list.indexOf("testdata2"); // 1
+Integer j = list.lastIndexOf(1);       // 7
+
+```
+
+
+* **JavaScript**:
+```javascript
+var json = S('{"test-array" : ["testdata1","testdata2",1,2,true,1,false,1]}');
+var list = json.prop("test-array");
+
+var i = list.indexOf("testdata2"); // 1
+var j = list.lastIndexOf(1);       // 7
+
+```
+
+
+
+### 8.3 Example 2: adding and removing entries
+
+* **Java**:
+```java
+SpinJsonNode json = JSON("{\"test-array\" : [\"testdata1\",\"testdata2\",1,2,true,1,false,1]}");
+SpinJsonNode list = json.prop("test-array");
+
+list.append("test2"); // "test2" is now at the end
+list.remove("test2"); // removes "test2"
+
+list.insertAt(1, "test3"); // "test3" goes before "testdata2"
+list.removeAt(1);          // removes the entry at index 1
+
+list.insertBefore(true, "test4"); // "test4" sits at index 4
+list.insertAfter(true, 5);        // 5 sits at index 6
+
+```
+
+
+* **JavaScript**:
+```javascript
+var json = S('{"test-array" : ["testdata1","testdata2",1,2,true,1,false,1]}');
+var list = json.prop("test-array");
+
+list.append("test2"); // "test2" is now at the end
+list.remove("test2"); // removes "test2"
+
+list.insertAt(1, "test3"); // "test3" goes before "testdata2"
+list.removeAt(1);          // removes the entry at index 1
+
+list.insertBefore(true, "test4"); // "test4" sits at index 4
+list.insertAfter(true, 5);        // 5 sits at index 6
+
+```

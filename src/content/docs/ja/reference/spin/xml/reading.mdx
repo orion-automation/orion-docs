@@ -1,0 +1,91 @@
+---
+title: XML の読み込み
+description: SPIN の XML データ形式で、文字列や文字ストリームから XML を読み込んで解析します。
+sidebar:
+  order: 1
+---
+
+## 1. XML の読み込み
+
+SPIN の XML データ形式は、文字列または文字ストリームから XML を読み込んで解析します。
+
+### 1.1 文字列から読み込む
+
+Java で XML 文字列を操作可能なオブジェクトに変換する方法は 2 つあります。
+
+* **形式を明示する**：`S()` に `xml()` を渡し、内容が XML であることを SPIN に伝えます。
+
+```java
+import static org.camunda.spin.Spin.*;
+import static org.camunda.spin.DataFormats.*;
+
+SpinXmlElement xml = S("<order />", xml());
+```
+
+* **ショートカットを使う**：`XML()` で直接解析します。
+
+```java
+import static org.camunda.spin.Spin.*;
+
+SpinXmlElement xml = XML("<order />");
+```
+
+どちらも同じ種類のオブジェクトを返します。解析時に構造が検証されるため、閉じタグの欠落などはその場で例外になります。
+
+### 1.2 文字ストリームから読み込む
+
+`java.io.Reader` から直接読み込めるため、ファイルやネットワーク応答をいったん文字列にする必要はありません。
+
+```java
+import static org.camunda.spin.Spin.*;
+
+FileInputStream fis = new FileInputStream("/tmp/incomingOrder.xml");
+InputStreamReader reader = new InputStreamReader(fis, "utf-8");
+SpinXmlElement xml = XML(reader);
+```
+
+`S(reader, xml())` でも同じです。
+
+### 1.3 スクリプト言語から読み込む
+
+スクリプト言語は動的型付けなので形式の指定は不要で、SPIN が自動的に判別します。
+
+```javascript
+var orderId = S('<order id="1231" />').attr('id');
+```
+
+この 1 行で、XML の解析とルート要素の `id` 属性の取得が同時に行われます。
+
+## 2. ノードの型
+
+返ってくるのは 1 つの汎用オブジェクトではなく、用途別に分かれた複数の型です。型を間違えると、使いたいメソッドがそもそも存在しません。
+
+| 型 | 表すもの | 主な入手元 |
+| :--- | :--- | :--- |
+| `SpinXmlElement` | 任意の XML 要素 | `XML(...)`、`S(..., xml())` の戻り値 |
+| `SpinXmlTreeElement` | ツリー全体を持つ要素。子要素の追加・削除が可能 | 解析結果、`childElement(...)` |
+| `SpinXmlDomElement` | DOM レベルの操作が可能な要素 | 解析結果、`childElement(...)` |
+| `SpinXmlAttribute` | 1 つの属性 | `attr(...)`、`attrNs(...)` |
+| `SpinXmlTreeAttribute` | クエリで取得した属性 | `xPath(...).attribute()` |
+| `SpinList<T>` | ノードまたは属性のリスト | `childElements(...)`、`elementList()` |
+| `SpinCollection<T>` | 属性または要素のコレクション | `attrs()`、`attributes()` |
+
+属性操作と子要素操作を併用する場合は、`SpinXmlTreeElement` で受け取るのが最も簡単です。
+
+## 3. 名前空間
+
+同じローカル名の要素が別の名前空間に存在することがあります。`Ns` 付きのメソッドは名前空間 URI を要求し、付いていないメソッドは名前空間を持たない名前だけに一致します。
+
+| 呼び出し | 一致する対象 |
+| :--- | :--- |
+| `attr("id")` | 名前空間を持たない `id` のみ |
+| `attrNs(uri, "id")` | 指定した名前空間の `id` |
+| `childElement("item")` | 名前空間を持たない `item` のみ |
+| `childElement(uri, "item")` | 指定した名前空間の `item` |
+
+取り違えても例外にはならず、単に何も取得できません。原因調査で最も遠回りしやすいところです。
+
+## 4. 関連ページ
+
+- 属性と子要素の追加・削除：[XML の要素と属性の操作](/ja/reference/spin/xml/manipulating/)
+- XPath クエリと名前空間プレフィックス：[XML のクエリ](/ja/reference/spin/xml/querying/)

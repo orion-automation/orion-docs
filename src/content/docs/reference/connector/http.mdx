@@ -1,58 +1,75 @@
 ---
 title: HTTP 连接器
-description: Camunda Connect HTTP 连接器的底层 API、Modeler 界面配置映射、请求构建、响应处理及自定义配置架构规范参考。
+description: HTTP 连接器的参数约定、在流程设计器中的配置映射、底层调用接口、错误与响应处理，以及使用限制。
 ---
 
-## 1. 描述 (Description)
+## 1. 概述
 
-在 ORION Connect 架构中，引擎提供了一个 `Connectors` 类，用于自动检测类路径 (classpath) 中的所有连接器。架构师和开发人员可以通过指定的连接器 ID (`http-connector`) 获取 HTTP 连接器的底层执行实例。
+HTTP 连接器让流程直接发出 REST 与 HTTP 请求，不必为此编写 Java 委派代码。在不引入外部组件的前提下，这是流程与第三方接口对接的默认方式。
 
-HTTP 连接器提供了一种无需编写 Java 委派代码，即可在流程中直接发起 REST API 或 HTTP 请求的原生方式。
+连接器在引擎侧有固定的标识 `http-connector`。引擎会扫描类路径上的连接器实现，按这个标识取出实例；这也是流程设计器里「连接器 ID」要填的值。
 
-## 2. Modeler 流程设计器配置映射 (Modeler Configuration)
+## 2. 在流程设计器中使用
 
-在实际的 BPMN 业务建模中，HTTP 连接器通常挂载在**服务任务 (Service Task)** 或**发送任务 (Send Task)** 上。其底层通过执行态的输入/输出映射 (Input/Output Mapping) 与上一节提到的泛型 API 进行一一对应。
+HTTP 连接器挂在**服务任务**或**发送任务**上。界面上的每一项配置，最终都变成引擎执行时的一组输入与输出参数。
 
-### 2.1 基础节点配置
-在节点属性面板中，必须完成以下声明：
-* **Implementation (实现方式)**: 选择 `Connector`。
-* **Connector Id (连接器 ID)**: 必须严格填写 `http-connector`。
+### 2.1 基础配置
 
-### 2.2 输入参数映射 (Input Parameters)
-通过配置 Input Parameter，向底层的请求对象注入参数：
+在属性面板中完成两项声明：
 
-| 参数名称 (Name) | 变量类型 (Type) | 必填 | 架构与业务说明 |
-| :--- | :--- | :--- | :--- |
-| **`method`** | `String` | 是 | HTTP 动词，如 `GET`, `POST`, `PUT`, `DELETE` 等。 |
-| **`url`** | `String` | 是 | 目标接口地址。支持 `${}` 表达式动态拼接流程变量。 |
-| **`headers`** | `Map` | 否 | 请求头字典。常用于注入 `Authorization`, `Content-Type` 或 `Accept`。 |
-| **`payload`** | `Text` / `Script` | 否 | 请求体载荷（主要用于 POST/PUT）。若载荷为动态生成的复杂 JSON，建议此处类型选择 `Script` 并结合 SPIN 或 FreeMarker 模板生成。 |
-
-### 2.3 输出参数映射 (Output Parameters)
-执行完毕后，底层的响应数据存在于连接器的临时上下文中，必须通过 Output Parameter 将其提取并持久化为流程变量：
-
-| 内部提取变量 | 映射类型 (Type) | 架构与业务说明 |
+| 属性 | 取值 | 说明 |
 | :--- | :--- | :--- |
-| **`statusCode`** | `String` | 提取 HTTP 响应状态码（如 200, 404）。常用于后续排他网关的业务路由分支判断。 |
-| **`response`** | `String` / `Script` | 提取响应体报文。**核心实践**：如果是 JSON 响应，强烈建议此处使用 JavaScript 或 Groovy 脚本 `S(response)` 直接将其转化为 SPIN 对象再存入流程变量。 |
-| **`headers`** | `Map` | 提取响应头字典，供有需要的业务链路验证令牌或缓存策略。 |
+| 实现 | 连接器 | 选它，属性面板才会出现连接器的输入与输出两张表 |
+| 连接器 ID | `http-connector` | 引擎按这个标识取实现；写错时部署不报错，运行时找不到连接器 |
 
-## 3. Apache HTTP Client 架构集成 (Apache HTTP Client Integration)
+### 2.2 输入参数
 
-HTTP 客户端在底层依赖 Apache HTTP Client 来执行实际的网络请求，并支持所有相应的底层配置选项。
+输入参数在任务执行前求值，逐个注入请求对象。
 
-* **默认配置**: 默认情况下，HTTP 客户端使用 Apache 的默认配置，并完全遵守 HTTP Client 支持的标准系统属性。
-* **5.x 版本迁移**: 从 Camunda 7.24 版本开始，Connect HTTP 连接器底层升级为使用 Apache HTTP Client 5.x 架构。虽然高层的 Connect API 保持向下兼容，但任何自定义配置和代码扩展都必须迁移使用新的 HttpClient 5.x 包结构（`org.apache.hc.client5.*` 和 `org.apache.hc.core5.*`），以替代旧版的 4.x 包。
+| 名称 | 类型 | 必填 | 说明 |
+| :--- | :--- | :--- | :--- |
+| `method` | 字符串 | 是 | HTTP 动词：`GET`、`POST`、`PUT`、`DELETE`、`PATCH`、`HEAD`、`OPTIONS`、`TRACE` |
+| `url` | 字符串 | 是 | 目标地址。支持 `${…}` 表达式，可在运行时拼流程变量 |
+| `headers` | 映射 | 否 | 请求头。常用于 `Authorization`、`Content-Type`、`Accept` |
+| `payload` | 文本或脚本 | 否 | 请求体，主要用于 `POST` 与 `PUT`。需要动态构造复杂 JSON 时，把类型设为脚本，用表达式或模板生成 |
 
-## 4. 自定义配置 (Custom Configuration)
+这四项之外，连接器不认别的输入参数名。查询参数没有单独的位置——它要拼进 `url`，形如 `https://example.com/orders?page=1&size=50`。静态部分直接写成字面量；来自流程变量的部分写成 `${…}`，由引擎在运行时替换。
 
-如果业务场景需要超越默认配置的功能（例如配置特定大小的连接池或连接管理器），推荐的架构实践是实现并注册一个新的连接器配置器 (Connector Configurator)。
+### 2.3 输出参数
 
-### 4.1 编写配置器类
-以下示例展示了如何注入自定义的 `PoolingHttpClientConnectionManager`：
+请求结束后，响应数据先落在连接器的临时上下文里，不写回流程。要让后续节点用得上，必须通过输出参数把它取出来并命名为流程变量。
+
+| 名称 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `statusCode` | 字符串 | HTTP 状态码，如 `200`、`404`。后续按状态码分支时取它 |
+| `response` | 文本或脚本 | 响应体。**它是字符串，不是对象**：要在后续节点里逐字段取值，得先解析成 JSON |
+| `headers` | 映射 | 响应头，可用于校验令牌、读取缓存策略 |
+
+输出参数的写法与输入相反：左边是「存进哪个流程变量」，右边是取值表达式——例如把 `statusCode` 存进 `orderStatus`。取字段时用 JSON 解析表达式，如 `S(response).prop("total")`；解析与取值语法见 [操作 JSON 数据](/reference/spin/json/querying/)。
+
+### 2.4 与连接器资源的关系
+
+设计模块里的连接器资源维护的是同一套调用参数：接口地址、方法、请求头模板、查询参数、请求体模板、响应字段。把它挂到服务任务上时，这些内容被编译成这里的两张参数表，并在 `url`、`headers`、`payload` 里填入运行时的流程变量。
+
+因此两边不是两套配置，而是同一份调用计划的两个视图：连接器资源是复用单元，属性面板上的参数表是它在单个任务上的落地结果。
+
+## 3. 底层 HTTP 客户端
+
+连接器本身不实现网络传输，实际请求由 Apache HttpClient 发出，因此底层配置项同样生效。
+
+- 默认使用 HttpClient 的标准配置，并遵守它支持的 HTTP 系统属性。
+- 引擎使用 HttpClient 5.x，包结构为 `org.apache.hc.client5.*` 与 `org.apache.hc.core5.*`。高层连接器接口保持兼容，但自定义配置与扩展代码必须按 5.x 的包结构编写。
+
+## 4. 自定义配置
+
+需要突破默认配置时——例如指定连接池大小或替换连接管理器——做法是实现并注册一个连接器配置器。
+
+### 4.1 编写配置器
+
+下面的例子把自定义的连接池注入连接器：
 
 ```java
-package org.camunda.connect.example;
+package com.example.connector;
 
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
@@ -81,99 +98,105 @@ public class HttpConnectorConfigurator implements ConnectorConfigurator<HttpConn
 
 ```
 
-### 4.2 注册 SPI (Service Provider Interface)
+### 4.2 注册配置器
 
-为了让引擎自动检测到这个新的配置器，必须在项目资源目录下的 `META-INF/services/org.camunda.connect.spi.ConnectorConfigurator` 文件中，声明该配置器类的全限定名。
-
-## 5. 底层请求构建与执行 (Requests via API)
-
-在 Java 环境或自定义组件中直接调用时，HTTP 连接器提供了一套流式 API。它不仅支持 GET 和 POST，还完整支持 PUT、DELETE、PATCH、HEAD、OPTIONS 和 TRACE 等 HTTP 动词。
-
-### 5.1 创建 HTTP 请求
-
-* **简单 GET 请求**:
-```java
-http.createRequest()
-  .get()
-  .url("[http://camunda.org](http://camunda.org)")
-  .execute();
+引擎靠 SPI 发现配置器。在项目的资源目录下新增文件 `META-INF/services/org.camunda.connect.spi.ConnectorConfigurator`，写入配置器类的全限定名：
 
 ```
+com.example.connector.HttpConnectorConfigurator
+```
 
+类路径上有多个配置器时，引擎会依次调用它们。
 
-* **带 Payload 的 POST 请求**:
+## 5. 直接调用连接器
+
+在 Java 环境或自定义组件中，可以用流式接口直接发请求。
+
+### 5.1 创建请求
+
 ```java
+// 简单 GET
+http.createRequest()
+  .get()
+  .url("https://example.com/orders")
+  .execute();
+
+// 带请求体的 POST
 http.createRequest()
   .post()
-  .url("[http://camunda.org](http://camunda.org)")
+  .url("https://example.com/orders")
   .contentType("text/plain")
   .payload("Hello World!")
   .execute();
-
 ```
 
-
-
-### 5.2 添加自定义请求头 (Headers)
-
-可以通过 `.header()` 方法向 HTTP 请求中注入自定义的请求头。
+### 5.2 添加请求头
 
 ```java
 HttpResponse response = http.createRequest()
   .get()
   .header("Accept", "application/json")
-  .url("[http://camunda.org](http://camunda.org)")
+  .url("https://example.com/orders")
   .execute();
-
 ```
 
-## 6. HTTP 响应错误处理 (Error Handling)
+## 6. 错误处理
 
-在默认架构下，HTTP 连接器在调用期间遇到 4XX（客户端错误）或 5XX（服务器错误）状态码时，**不会**自动抛出异常。
+默认情况下，收到 4XX 或 5XX 响应时连接器不抛异常——请求照常返回，状态码留在 `statusCode` 里。流程是否继续，由后续网关自行判断。
 
-为了在不需要编写额外脚本逻辑的情况下激活错误阻断机制，可以通过 `configOption` 方法（或在 Modeler 中配置 Input Parameter）将 `throw-http-error` 属性强制设置为 `TRUE`。开启该选项后，一旦遇到 HTTP 响应错误，引擎将直接抛出异常，从而可以触发挂载在任务边界上的 BPMN 错误事件。
+要让错误自动中断当前路径，把配置项 `throw-http-error` 置为 `TRUE`：
 
 ```java
 HttpResponse response = http.createRequest()
   .get()
   .configOption("throw-http-error", "TRUE")
-  .url("[http://camunda.org](http://camunda.org)")
+  .url("https://example.com/orders")
   .execute();
-
 ```
 
-## 7. 响应处理 (Response)
+同样的设置也可以在流程设计器里通过输入参数 `throw-http-error` 给定。开启后，响应错误会直接抛出异常，挂在该任务上的错误边界事件随之触发，不必再写脚本判断。
 
-执行请求后返回的响应对象中，包含了 HTTP 状态码、响应头字典以及响应体报文。
+## 7. 响应处理
+
+响应对象提供状态码、响应头与响应体三项内容。
 
 ```java
 Integer statusCode = response.getStatusCode();
-String contentTypeHeader = response.getHeader("Content-Type");
+String contentType = response.getHeader("Content-Type");
 String body = response.getResponse();
-
 ```
 
-**架构规范**: 在 Java 代码中成功处理完业务响应后，必须显式调用 `response.close()` 方法关闭底层连接以释放 I/O 资源（如果是在 BPMN 模型中通过参数映射使用，引擎会自动处理资源释放）。
+在 Java 代码里用完响应后必须显式调用 `response.close()` 释放连接。在流程设计器中通过参数映射使用时，引擎负责释放。
 
-## 8. 泛型 API (Generic API)
+## 8. 泛型接口
 
-除了专用的流式方法外，连接器还提供了一套底层的泛型 API，允许通过动态传参的方式设置请求或提取响应。这也是 Modeler 中 Input/Output 映射的底层依托。
+除流式方法外，连接器还提供一套按名字传参的泛型接口。流程设计器里的输入与输出参数表，底层走的正是这套接口。
 
-### 8.1 请求泛型设置
+### 8.1 设置请求参数
 
 ```java
 HttpRequest request = http.createRequest();
 request.setRequestParameter("method", "GET");
-request.setRequestParameter("url", "[http://camunda.org](http://camunda.org)");
+request.setRequestParameter("url", "https://example.com/orders");
 request.setRequestParameter("payload", "hello world!");
-
 ```
 
-### 8.2 响应泛型提取
+### 8.2 读取响应参数
 
 ```java
 response.getResponseParameter("statusCode");
 response.getResponseParameter("headers");
 response.getResponseParameter("response");
-
 ```
+
+## 9. 限制与前提
+
+| 限制 | 说明 |
+| :--- | :--- |
+| 输入参数只有四项 | `method`、`url`、`headers`、`payload`。没有单独的查询参数、超时或重试参数，这些要在地址、请求头或上层流程里解决 |
+| 没有服务基址的概念 | 连接器只认完整地址。要按环境切换主机名，需在 `url` 里引用流程变量，并在部署时提供同名变量 |
+| 相对地址需要额外变量 | 由连接器资源配置生成的相对地址会落成 `${baseUrl}`，运行时必须存在名为 `baseUrl` 的流程变量，否则请求直接失败 |
+| 请求体的值一律是字符串 | 通过参数表给出的请求体以字符串送出。数字、布尔与嵌套结构需要自行序列化 |
+| 字段级输出依赖 JSON 解析 | 连接器只返回响应体字符串。逐字段取值需要有可用的 JSON 解析能力，解析不可用时该表达式求值失败 |
+| 不校验内容类型 | 连接器不会替你补 `Content-Type`。发送 JSON 时必须自己写进 `headers`，否则对端可能按表单解析 |
+| 错误默认不阻断 | 4XX 与 5XX 不会自动抛异常，除非开启 `throw-http-error` |

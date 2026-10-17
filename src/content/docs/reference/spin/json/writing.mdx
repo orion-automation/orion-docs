@@ -1,15 +1,17 @@
 ---
 title: 写入与序列化 JSON
-description: Camunda Spin 库将 JSON 节点对象序列化为标准字符串或直接写入字符流的底层 API 规范参考。
+description: SPIN 数据格式将 JSON 节点对象序列化为标准字符串或直接写入字符流的接口参考。
+sidebar:
+  order: 2
 ---
 
-## 1. 描述 (Description)
+## 1. 概述
 
-在操作完 JSON 数据树之后，Spin 库提供了将底层的 `SpinJsonNode` 对象重新序列化为标准 JSON 格式的机制。
+在操作完 JSON 数据树之后，SPIN 提供了将底层的 `SpinJsonNode` 对象重新序列化为标准 JSON 格式的机制。
 
-在底层的执行态中，Spin JSON 数据类型原生支持将对象状态输出为字符串（Strings）或直接写入字符流（Writers）。这是将处理完毕的业务变量结构化输出、供外部系统消费或进行物理持久化的最终步骤。
+在底层的执行态中，SPIN JSON 数据类型原生支持将对象状态输出为字符串或直接写入字符流。这是将处理完毕的业务变量结构化输出、供外部系统消费或进行物理持久化的最终步骤。
 
-## 2. 输出为字符串 (Writing to a String)
+## 2. 输出为字符串
 
 这是最直接的序列化方法。通过调用 `SpinJsonNode` 对象的 `.toString()` 方法，可以获取该节点及其所有嵌套子节点的标准 JSON 字符串表示。
 
@@ -27,7 +29,7 @@ String jsonString = jsonNode.toString();
 
 ```
 
-## 3. 写入字符流 (Writing to a Writer)
+## 3. 写入字符流
 
 对于需要将业务 JSON 数据直接输出到文件、网络响应或其他底层 I/O 通道的场景，直接将数据写入 `java.io.Writer` 是标准的工程实践。
 

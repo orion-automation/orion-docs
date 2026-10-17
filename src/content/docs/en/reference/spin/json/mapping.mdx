@@ -1,0 +1,82 @@
+---
+title: Mapping JSON to objects
+description: Interface reference for two-way conversion between JSON and Java objects through Jackson.
+sidebar:
+  order: 4
+---
+
+## 1. Overview
+
+SPIN integrates the Jackson mapping library, which gives two-way conversion between JSON data and Java objects. A JSON payload can be mapped directly onto a strongly typed Java object, and a Java object can be serialized straight back into standard JSON.
+
+## 2. Mapping to and from an object model
+
+Take a `Customer` class:
+
+```java
+public class Customer {
+  private String name;
+  public String getName() { return name; }
+  public void setName(String name) { this.name = name; }
+}
+
+```
+
+### 2.1 JSON to Java
+
+`mapTo()` maps a JSON object onto a Java instance.
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+// map a JSON object onto a Customer instance
+Customer customer = JSON("{\"name\": \"Kermit\"}").mapTo(Customer.class);
+
+```
+
+### 2.2 Java to JSON
+
+Turning a Java object back into a JSON string is direct.
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+// turn a Java object back into a JSON string
+String json = JSON(customer).toString();
+
+```
+
+## 3. Primitives and strings
+
+SPIN maps Java primitives such as booleans and numbers onto the matching JSON values. `JSON(true)`, for instance, maps to the JSON constant `true`.
+
+Strings are the exception:
+
+* **No automatic conversion**: a plain String value is not turned into JSON on its own.
+* **Invalid JSON**: `JSON("a String")` throws, because `"a String"` has no escaped quotes and is therefore not valid JSON.
+* **Collections**: a list of String values is converted into a JSON array correctly.
+
+## 4. Generic types
+
+For collection types such as `List<Customer>`, Java type erasure means `mapTo(ArrayList.class)` alone cannot tell what the elements are.
+
+A canonical type string has to be supplied instead:
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+String json = "[{\"name\": \"Kermit\"}, {\"name\": \"Hugo\"}]";
+
+// declare the generic collection type with fully qualified names
+List<Customer> customers = JSON(json).mapTo("java.util.ArrayList<com.example.Customer>");
+
+```
+
+## 5. Polymorphic types
+
+When a property is declared as an interface or an abstract class, Jackson cannot infer the concrete class from the static shape of the owning type — a `Car` interface may be implemented by `StationWagon`, `Van` and others.
+
+### 5.1 Approach
+
+* **Type information in the payload**: Jackson relies on type information carried explicitly in the JSON to deserialize a polymorphic value.
+* **Configuration**: the serialization and deserialization strategy for those types has to be configured following Jackson's documentation. That configuration belongs in the JSON data format configuration described in [Configuring JSON handling](/en/reference/spin/json/configuring/), so the engine can instantiate the right subclass when it reads a payload with polymorphic references.

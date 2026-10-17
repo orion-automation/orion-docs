@@ -1,0 +1,53 @@
+---
+title: JSON の書き出しとシリアライズ
+description: JSON ノードを標準の文字列へ、または文字ストリームへ直接書き出すためのインターフェースリファレンス。
+sidebar:
+  order: 2
+---
+
+## 1. 概要
+
+JSON のツリーを操作し終えたら、SPIN は基になる `SpinJsonNode` を標準の JSON に戻してシリアライズできます。
+
+実行時、JSON データ形式はオブジェクトの状態を文字列へ、または文字ストリームへ直接書き出します。これは、処理済みの業務変数を外部システムが消費できる構造化データとして出力したり、物理的に永続化したりする最終段階です。
+
+## 2. 文字列への書き出し
+
+最も直接的なシリアライズ方法です。`SpinJsonNode` に対して `.toString()` を呼ぶと、そのノードと入れ子になったすべての子の標準 JSON 表現が得られます。
+
+### 2.1 ノードのシリアライズ
+
+Java では、操作後のノードをそのまま文字列に変換できます。
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+// JSON ノードを作成または操作
+SpinJsonNode jsonNode = JSON("{\"customer\": \"Kermit\"}");
+
+// ノードを標準の文字列にシリアライズ
+String jsonString = jsonNode.toString();
+
+```
+
+## 3. 文字ストリームへの書き出し
+
+JSON をファイル、ネットワーク応答、その他の I/O チャネルへ直接流したい場合は、`java.io.Writer` への書き出しが標準的な方法です。
+
+* **API**: `.writeToWriter(Writer writer)`。エンジンはシリアライズした内容を指定された Writer へ渡し、その同じ Writer を返します。
+
+### 3.1 文字ストリームへの書き出し例
+
+次の例はノードを `StringWriter` に書き出します。実際の用途では `FileWriter` や `PrintWriter` を宛先にしても同じです。
+
+```java
+import static org.camunda.spin.Spin.JSON;
+import java.io.StringWriter;
+
+// JSON ノードを作成または操作
+SpinJsonNode jsonNode = JSON("{\"customer\": \"Kermit\"}");
+
+// ノードを指定した Writer へ書き出す
+StringWriter writer = jsonNode.writeToWriter(new StringWriter());
+
+```

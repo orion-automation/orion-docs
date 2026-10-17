@@ -1,0 +1,71 @@
+---
+title: 写入与序列化 XML
+description: SPIN 数据格式把 XML 元素与属性输出为字符串、字符流或输出流的接口参考。
+sidebar:
+  order: 3
+---
+
+## 1. 输出为字符串
+
+`toString()` 把元素序列化成一段 XML 文本。这是最常用的出口：存流程变量、写日志、放进报文体。
+
+```java
+import static org.camunda.spin.Spin.XML;
+
+SpinXmlElement element = XML("<root id=\"test\"/>");
+String xml = element.toString();
+```
+
+属性对象单独序列化时只输出值本身，不带属性名。
+
+```java
+String value = element.attr("id").value();   // "test"
+```
+
+## 2. 写入字符流
+
+内容较大、或不想在内存里多存一份字符串时，直接写进 `java.io.Writer`。
+
+```java
+SpinXmlElement element = XML("<root id=\"test\"/>");
+
+StringWriter writer = new StringWriter();
+element.writeToWriter(writer);
+```
+
+元素与属性都支持 `writeToWriter`，可以连续写入同一个流。
+
+```java
+element.writeToWriter(writer);
+element.attr("id").writeToWriter(writer);
+```
+
+## 3. 写入输出流
+
+`writeToWriter` 接收的是字符流，字节流要先包一层并指定编码。
+
+```java
+OutputStreamWriter outputStreamWriter = new OutputStreamWriter(System.out);
+element.writeToWriter(outputStreamWriter);
+outputStreamWriter.write("\n");
+outputStreamWriter.close();
+```
+
+编码要显式给出，否则按平台默认编码输出，中文与特殊符号在不同机器上会不一致。
+
+## 4. 输出结果说明
+
+| 项 | 行为 |
+| :--- | :--- |
+| 缩进 | 不自动美化，输出与解析时的结构一致 |
+| 声明 | 不自动补 `<?xml ... ?>` 声明 |
+| 命名空间 | 保留原有的前缀与 URI 声明 |
+| 编码 | 由调用方指定的字符流决定 |
+| 空元素 | 空元素输出为自闭合形式 |
+
+需要固定的报文外观（例如对方系统按字节比对），应在业务代码里自行规范化，而不是依赖序列化的默认行为。
+
+## 5. 相关文档
+
+- 修改属性与子元素：见 [操作 XML 元素与属性](/reference/spin/xml/manipulating/)
+- 把对象直接序列化成 XML：见 [XML 对象映射](/reference/spin/xml/mapping/)

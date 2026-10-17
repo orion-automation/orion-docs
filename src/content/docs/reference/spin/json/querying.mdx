@@ -1,17 +1,19 @@
 ---
 title: JSON 查询
-description: Camunda Spin 库使用 JSONPath 语言进行 JSON 数据查询、过滤及类型提取的底层规范参考。
+description: SPIN 数据格式使用 JSONPath 语言进行 JSON 数据查询、过滤及类型提取的接口参考。
+sidebar:
+  order: 3
 ---
 
-## 1. 描述 (Description)
+## 1. 概述
 
-Spin JSON 数据类型原生支持通过 JSONPath 查询语言进行数据检索。
+SPIN JSON 数据类型支持通过 JSONPath 查询语言进行数据检索。
 
 JSONPath 提供了声明式的查询能力，允许使用路径表达式从深层嵌套的 JSON 结构中定位节点、提取集合或根据业务规则进行条件过滤。这是处理复杂 JSON 载荷的高效方案。
 
-## 2. 基础查询模式 (Querying Patterns)
+## 2. 基础查询模式
 
-使用 `.jsonPath(String path)` 方法发起查询。查询后，必须调用具体的转换方法（如 `.element()` 或 `.elementList()`）将查询结果解析为可操作的 Spin 对象或集合。
+使用 `.jsonPath(String path)` 方法发起查询。查询后，必须调用具体的转换方法（如 `.element()` 或 `.elementList()`）将查询结果解析为可操作的 SPIN 对象或集合。
 
 测试使用的 JSON 数据结构如下：
 ```json
@@ -26,7 +28,7 @@ JSONPath 提供了声明式的查询能力，允许使用路径表达式从深�
 
 ```
 
-### 2.1 单个节点查询 (Querying an Element)
+### 2.1 单个节点查询
 
 用于精准定位 JSON 树中的某个特定节点。
 
@@ -37,7 +39,7 @@ SpinJsonNode child = JSON(json).jsonPath("$.child[0]").element();
 
 ```
 
-### 2.2 节点列表查询 (Querying an Element List)
+### 2.2 节点列表查询
 
 用于提取符合路径描述的所有节点集合，返回 `SpinList<SpinJsonNode>` 类型。
 
@@ -48,9 +50,9 @@ SpinList<SpinJsonNode> childs = JSON(json).jsonPath("$.child").elementList();
 
 ```
 
-## 3. 强类型值提取 (Type-Specific Extraction)
+## 3. 强类型值提取
 
-查询路径表达式后，Spin 支持直接获取符合特定 Java 类型的结果。
+查询路径表达式后，SPIN 支持直接获取符合特定 Java 类型的结果。
 
 ### 3.1 字符串提取
 
@@ -85,7 +87,7 @@ Boolean exists = JSON(json).jsonPath("$.boolean").boolValue();
 
 ```
 
-## 4. 过滤查询 (Filtering a Query)
+## 4. 过滤查询
 
 JSONPath 支持在路径中使用 `?()` 语法进行条件过滤。
 
@@ -106,7 +108,7 @@ SpinList<SpinJsonNode> girls = JSON(json).jsonPath("$.child[?(@.sex == 'female')
 ```
 
 
-## 5. 最佳实践指南 (Architectural Constraints)
+## 5. 性能与约束
 
 **性能成本**: 相比直接使用 `.prop()` 属性访问，JSONPath 解析器在执行时需要额外的开销来计算路径。在低延迟要求的服务任务逻辑中，若路径深度固定且已知，优先使用 `.prop()` 访问。
 **空结果处理**: 若 JSONPath 查询未能匹配到任何节点，方法可能返回空结果，或在调用取值方法时抛出异常。务必在执行查询前确保数据结构符合预期，或通过 `try-catch` 进行运行时防御。

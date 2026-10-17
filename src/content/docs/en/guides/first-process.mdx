@@ -1,0 +1,203 @@
+---
+title: Build your first business process
+description: In this tutorial we build a complete process with lanes, deploy it to the engine, and start a real run of it.
+sidebar:
+  order: 1
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<p class="lead">
+  In this tutorial we build a business process that actually runs: starting from a workspace, all the way to a diagram on the canvas, then deploying it to the engine and starting a real run. No code involved.
+</p>
+
+## 1. Overview and the finished result
+
+We walk a single path of seven steps:
+
+| Step | What we do | What we have afterward |
+| :--- | :--- | :--- |
+| 1 | Create a workspace | A workspace that already holds one business app |
+| 2 | Open the workspace | The list of business apps in it |
+| 3 | Open the business app | The workbench for design and discovery assets |
+| 4 | Create a process | A canvas with a pool, a lane and a start event |
+| 5 | Draw the process | A connected process with a branch |
+| 6 | Deploy to the engine | A deployment record on the engine |
+| 7 | Start a run | A process instance that is actually running |
+
+The steps have a clear cause and effect: **a workspace holds business apps, a business app holds processes, and only a deployed process can be started.** Keep that line in mind and none of the clicks will be confusing.
+
+## 2. Before we start
+
+<Aside type="note" title="Prerequisites">
+
+- You are signed in to ORION and can open the Build module.
+- Your account is allowed to create workspaces.
+
+If opening Build shows "This account has no workspace of its own", the account is not fully set up yet. Ask whoever operates your ORION installation to sort it out first, because none of the following steps can proceed.
+
+</Aside>
+
+## 3. Step by step
+
+### Step 1: Create a workspace
+
+**Our goal**
+
+Get a container. The workspace is the outermost box in this product: business apps, processes, forms and connectors all live inside one.
+
+**What we do**
+
+1. Open the Build module and land on My workspaces.
+2. Click `Create workspace` in the top right corner.
+3. Fill in the **Workspace name**, for example "Order fulfillment".
+4. The same dialog also asks for an **Initial business app name**. This creates our first business app for us; it defaults to "Business Process App", so we leave it as is.
+5. Click `Create`.
+
+**What we should see**
+
+The dialog closes and the new workspace appears in the list, with our account listed as a collaborator. A business app named "Business Process App" is already in place inside it.
+
+**Where to look**
+
+Notice that we did **not** create a business app separately. The product deliberately saves newcomers a step: creating the workspace also lays down the first app. Every process we build lives under that app.
+
+### Step 2: Open the workspace
+
+**Our goal**
+
+Get inside the box we just created and see what it holds.
+
+**What we do**
+
+Click the name of the workspace we just created.
+
+**What we should see**
+
+The page switches to the workspace detail, and the Business Apps tab lists "Business Process App".
+
+**Where to look**
+
+The columns tell us what is inside: number of business apps, collaborators, creation time and last update. To tell whether this is the workspace we were in last time, the last update column answers fastest.
+
+### Step 3: Open the business app
+
+**Our goal**
+
+Get into the business app and see how its assets are organized.
+
+**What we do**
+
+Click the "Business Process App" row.
+
+**What we should see**
+
+A tree with three sections on the left — `Discover`, `Design`, `Run` — and the workspace on the right.
+
+**Where to look**
+
+The three sections match three kinds of work: `Discover` holds the material and findings from mapping the status quo, `Design` holds what we draw, and `Run` lists the processes already deployed to the engine. All three are expanded by default; if one is collapsed, click its header to expand it.
+
+### Step 4: Create a process
+
+**Our goal**
+
+Get a blank canvas that already contains a pool, a lane and a start event.
+
+**What we do**
+
+Under the `Design` section, find the folder that holds processes, then click `New Process` on the empty-state card in the workspace area.
+
+**What we should see**
+
+The canvas opens with a pool, a lane inside it, and a start event named "Start" at the left end of the lane.
+
+<Aside type="tip" title="Worth noticing">
+
+The folder that holds processes has two names in this interface: it is called **Blueprint** in Designer view, the default, and **Orchestration** once you switch to Developer view. Same folder, same files — only the label follows the view. If you cannot find the folder, check which view is active in the bottom left corner first.
+
+</Aside>
+
+### Step 5: Draw the process
+
+**Our goal**
+
+Turn this diagram into a process that can really run: tasks, a branch, an end, and every shape connected.
+
+**What we do**
+
+1. In the modeling palette at the top left of the canvas, click `Task`, then click inside the lane to place it to the right of the start event.
+2. From the same palette pick `Exclusive gateway` and place it to the right of the task.
+3. Place another `Task` as the next step on the approved branch.
+4. Place an `End event` after the task.
+5. Drag from the connector on the right edge of the start event to the task, then connect the shapes that follow. For the branch, drag one connection out of each side of the gateway.
+
+**What we should see**
+
+The checklist in the bottom right corner ticks off in turn: pool, lane, start event, end event, task, gateway, and finally every node connected. When all of them are ticked, the process is done.
+
+**Where to look**
+
+The checklist is not decoration for the tutorial — it is how the product decides. **The process only counts as complete when the whole checklist is green.** Leave any item out and the diagram will misbehave on the engine after deployment. When drawing connections, start from a node's connector: dragging the shape itself only moves it.
+
+### Step 6: Deploy to the engine
+
+**Our goal**
+
+Hand the diagram on the canvas to the engine. Only a deployed process can be started.
+
+**What we do**
+
+1. Look at the view switch in the bottom left corner and switch to `Developer`.
+2. In the toolbar at the top right of the canvas, click `Deploy`.
+3. In the "Deploy to engine" dialog, confirm the engine address and the contents, which is the current process.
+4. Click `Deploy`.
+
+**What we should see**
+
+The dialog closes with a success message. Back in the tree on the left, the `Run` section now lists this process definition.
+
+**Where to look**
+
+`Deploy` only shows up in Developer view; Designer view does not offer it. That is not a permission problem — the two views serve different people. Also note that deployment always sends **what is on the canvas right now**, regardless of when you last saved.
+
+### Step 7: Start a run
+
+**Our goal**
+
+Let it actually run and then see the instance in the Run module.
+
+**What we do**
+
+1. Open the `Run` module and choose `Process Definitions` on the left.
+2. Find the process we just deployed and click `Start process`.
+3. Confirm each screen of the wizard: where to start, business key and variables, start options.
+4. Click `Start`.
+
+**What we should see**
+
+The wizard closes with a start result and a link to the process instance. Under process instances, the run is listed as active, highlighted on the task right after the start event.
+
+**Where to look**
+
+Starting asks three questions in a fixed order: **where to start, what to carry, how to execute.** With no instruction, it takes the process's default path — the main line you drew.
+
+## 4. What we built, and what comes next
+
+A quick look back:
+
+| What we built | What it solves |
+| :--- | :--- |
+| Workspace | Keeps this work separate from everyone else's |
+| Business app | Keeps the processes, forms and connectors of one business line together |
+| BPMN process | Turns "who does what, when" into a shape the engine can execute |
+| Deployment record | Lets the engine know the process, and keeps a version of it |
+| Process instance | One real occurrence of the business, which can be tracked and intervened in |
+
+The process is still plain: one task and one branch, no forms, no connectors, no agents. Those grow on this trunk:
+
+- The `AI Assistant` on the right of the canvas creates and connects elements from a single sentence, for example "add an approval gateway with approved and rejected branches". It reads the current canvas and changes the current canvas.
+- Forms, decisions and connectors are attached from the properties panel of the selected node.
+- The process document and node comments are saved with the model, which is where design intent belongs.
+
+There is no need to look at integration details yet. When we want to connect this process to an external system, [HTTP connector](/en/reference/connector/http/) and [BPMN modeler interface](/en/reference/bpmn/modeler/) will be waiting.

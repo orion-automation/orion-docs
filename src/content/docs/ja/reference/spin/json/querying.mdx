@@ -1,0 +1,118 @@
+---
+title: JSON のクエリ
+description: JSONPath 言語で JSON データを検索、絞り込み、型付きで取り出すためのインターフェースリファレンス。
+sidebar:
+  order: 3
+---
+
+## 1. 概要
+
+SPIN の JSON データ形式は、JSONPath クエリ言語によるデータ検索に対応しています。
+
+JSONPath は宣言的です。パス式によって、深く入れ子になった JSON 構造の中のノードを特定し、集合を取り出し、業務ルールで絞り込めます。大きなペイロードを扱いやすくするのはこの仕組みです。
+
+## 2. クエリの基本形
+
+クエリは `.jsonPath(String path)` で始めます。結果は `.element()` や `.elementList()` などの変換メソッドで、操作できる SPIN オブジェクトまたはコレクションに変換してから使います。
+
+以下の例ではこの JSON 構造を使います。
+
+```json
+{
+  "child": [
+    {"id": 1, "name": "Lucy", "sex": "female"},
+    {"id": 2, "name": "Tracy", "sex": "female"}
+  ],
+  "number": 1,
+  "boolean": true
+}
+
+```
+
+### 2.1 単一ノードの取得
+
+ツリー内の特定のノードが分かっている場合に使います。
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+SpinJsonNode child = JSON(json).jsonPath("$.child[0]").element();
+
+```
+
+### 2.2 ノード一覧の取得
+
+パスに一致するすべてのノードを取り出し、`SpinList<SpinJsonNode>` を返します。
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+SpinList<SpinJsonNode> childs = JSON(json).jsonPath("$.child").elementList();
+
+```
+
+## 3. 型を指定した取り出し
+
+パス式の後、SPIN は特定の Java 型として結果を直接返せます。
+
+### 3.1 文字列の取り出し
+
+`.stringValue()` はパス位置の文字列を返します。
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+String value = JSON(json).jsonPath("$.child[0].name").stringValue();
+
+```
+
+### 3.2 数値の取り出し
+
+`.numberValue()` はパス位置の数値を `Double` として返します。
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+Double count = JSON(json).jsonPath("$.number").numberValue();
+
+```
+
+### 3.3 真偽値の取り出し
+
+`.boolValue()` はパス位置の真偽値を返します。
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+Boolean exists = JSON(json).jsonPath("$.boolean").boolValue();
+
+```
+
+## 4. クエリの絞り込み
+
+JSONPath はパスの中で `?()` 構文による条件指定に対応しています。
+
+### 4.1 絞り込みの構文
+
+* **位置**: 条件式は括弧 `()` の中に書きます。
+* **引用符**: 条件式の中で二重引用符（`"`）は使えません。すべて単一引用符（`'`）で書きます。そうでないとクエリの解析に失敗します。
+
+### 4.2 絞り込みの例
+
+子の一覧から sex が `female` のレコードだけを取り出します。
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+SpinList<SpinJsonNode> girls = JSON(json).jsonPath("$.child[?(@.sex == 'female')]").elementList();
+
+```
+
+
+## 5. 性能と制約
+
+**コスト**: JSONPath の解析器はパスを評価するために、`.prop()` による直接アクセスより余分な処理を行います。パスの深さが固定で分かっている場合は `.prop()` のほうが安く済みます。
+
+**空の結果**: クエリが何にも一致しない場合、空の結果が返るか、値を読み取る時点で例外になります。構造がパスの想定どおりであることを確かめるか、読み取りを `try`/`catch` で囲みます。
+
+**単一引用符**: 絞り込みの中で比較するプロパティの値は単一引用符で囲みます。これは書き方の好みではなく、解析器が要求する制約です。

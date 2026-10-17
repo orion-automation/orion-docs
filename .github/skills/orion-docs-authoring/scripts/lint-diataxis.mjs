@@ -62,6 +62,65 @@ const COMPONENTS = [
 const EMOJI = /[\u{1F000}-\u{1FAFF}]/u;
 const PLACEHOLDER_LINK = /\]\((?:url|URL|link|链接|待补|TODO)\)/;
 
+/**
+ * 标题 → 锚点，与 Starlight（github-slugger）一致：
+ * 小写、去掉标点、空格换连字符，中文与数字原样保留。
+ * 例：`## 1. 描述` → `1-描述`；`### 7.8 AI 对话助手` → `78-ai-对话助手`
+ */
+function slugifyHeading(text) {
+	return text
+		.toLowerCase()
+		.replace(/<[^>]+>/g, '')
+		.replace(/`/g, '')
+		.replace(/[\u2000-\u206F\u2E00-\u2E7F]/g, '')
+		.replace(/[\0-\x1F!-,./:-@[-^`{-~\xA9\xAB-\xB4\xB6-\xB9\xBB-\xBF\xD7\xF7]/g, '')
+		.replace(/\s/g, '-');
+}
+
+/**
+ * 实现层术语黑名单：这些是**我们怎么写代码**的词，不是用户看得见的东西。
+ * 文档读者是业务设计者与架构师，读到「bpmn-js」「DOM」「IndexedDB」只会困惑。
+ * 命中即报错（例外见 EXEMPT_PATH）。
+ */
+const IMPL_TERMS = [
+	'bpmn-js',
+	'IndexedDB',
+	'localStorage',
+	'DOM',
+	'CSS 类',
+	'inert',
+	'configJson',
+	'businessObject',
+	'npm run',
+	'node_modules',
+];
+
+/**
+ * 产品底座名：不进文档。用户买的是 ORION，不是「某引擎的封装」。
+ *
+ * 只判 warn 而不是 error —— 仓内已有 20 篇 reference 在讲底层扩展属性时提到它，
+ * 一次性清完是独立任务；新写的文档不该再出现。
+ */
+const BASE_TECH_TERMS = ['Camunda', 'camunda'];
+
+/** 实现细节可以写的文件（方法论、规范正文本身讲的正是这些）。 */
+const EXEMPT_PATH = /bestpractices\/write(howto|explanation|reference|tutorial)\.mdx$/;
+
+/**
+ * 开发者接口参考：读者就是写代码的人，「DOM」「JAXBContext」这类词正是要查的东西，
+ * 而且是公开 API 的一部分（`SpinXmlDomElement`、`setObjectMapper`）。
+ * 只豁免 impl-leak 一条，其余机械规则照常。
+ */
+const DEV_API_PATH = /reference\/(spin|connector)\//;
+
+
+/**
+ * 「操作指令」：只抓**祈使句**（请点击 / 然后点击 / 行首点击 / 执行以下命令）。
+ * Reference 合法地描述按钮行为（「点击后弹出…」「通过点击或拖拽添加」），
+ * 那不是指令而是事实——按关键词一律报错会把按钮参考页面全部打红。
+ */
+const IMPERATIVE_ACTION = /(?:^|[\s，。、；：])(?:请|然后|接着|首先|需要|再)点击|^\s*点击|输入命令|执行以下|第一步/;
+
 /** Explanation 里禁止的代码块语言。 */
 const BANNED_FENCE_LANGS = new Set([
 	'bash',
@@ -232,7 +291,7 @@ function lintFile(absPath, repoRoot, forcedType) {
 	const rel = repoRoot ? relative(repoRoot, absPath).split(sep).join('/') : absPath;
 
 	// 四篇规范正文含大量「故意写错」的示例，不适用机械规则
-	if (/bestpractices\/write(howto|explanation|reference|tutorial)\.mdx$/.test(rel))
+	if (EXEMPT_PATH.test(rel))
 		return { absPath, rel, skipped: '规范正文（含故意反例），跳过机械检查', issues: [] };
 
 	const lines = source.split('\n');
@@ -283,6 +342,82 @@ function lintFile(absPath, repoRoot, forcedType) {
 		if (/^\s*<img\b/i.test(text)) add('error', 'prose/img', '禁止 <img>，图片不进正文', n);
 		if (/^#\s+\S/.test(text))
 			add('info', 'prose/h1', '正文 h1 只在落地页（splash / index）使用，普通文档由 title 渲染', n);
+
+		// 标题里的英文括注：多数只是中文的翻译（「评估 (Evaluation)」），删掉即可；
+		// 少数是引入术语原文（「协同 (Choreography)」），那种该留。
+		// 两种机械上分不开，所以只报 info 提示逐个判断，不做强制。
+		if (/^#{1,6}\s/.test(text) && /\([A-Za-z][A-Za-z /&-]*\)\s*$/.test(text))
+			add(
+				'info',
+				'heading/bilingual',
+				'标题带英文括注：若只是中文的翻译请删去，若是引入术语原文则保留',
+				n,
+			);
+
+		// 裸编号交叉引用：「详见 7.4」读者点不动，得自己滚过去找。
+		// 改成 [7.4 差异对比](#74-差异对比) 才是同一件事的正确写法。
+		if (/(?:详见|参见|见)\s*§?\d+(?:\.\d+)+\s*[。，、）)]?/.test(bare) && !/\]\(#/.test(bare))
+			add(
+				'warn',
+				'link/bare-section-ref',
+				'裸编号引用：改成 [N.N 章节名](#锚点) 让读者可以直接跳过去',
+				n,
+			);
+
+		// 读者是业务设计者与架构师：不要把我们怎么写代码的词写进产品文档
+		if (!DEV_API_PATH.test(rel))
+			for (const term of IMPL_TERMS) {
+				if (bare.includes(term))
+					add(
+						'error',
+						'prose/impl-leak',
+						`实现层术语「${term}」：文档描述用户看到的功能，不描述实现`,
+						n,
+					);
+			}
+		// 产品底座名同样不提：用户买的是 ORION
+		for (const term of BASE_TECH_TERMS) {
+			if (bare.includes(term))
+				add('warn', 'prose/base-tech', `底层技术名「${term}」不提：写 ORION 自身的概念`, n);
+		}
+		// 像素值同样属于实现细节
+		if (/\b\d+(\.\d+)?\s?px\b/.test(bare))
+			add('warn', 'prose/pixels', '出现像素值：改用用户可感知的描述（如「固定宽度」）', n);
+	}
+
+	// 页内锚点自检。MDX 不支持自定义锚点（`{#id}` 会把构建打挂），锚点只能由标题自动生成，
+	// 于是「改标题」等于「改锚点」，而多语言版本各用各的标题 —— 最容易在这里悄悄断掉。
+	const headingIds = new Set();
+	const slugSeen = new Map();
+	for (const { text } of prose) {
+		const m = text.match(/^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/);
+		if (!m) continue;
+		const base = slugifyHeading(m[1].trim());
+		if (!base) continue;
+		const seen = slugSeen.get(base) ?? 0;
+		slugSeen.set(base, seen + 1);
+		headingIds.add(seen === 0 ? base : `${base}-${seen}`);
+	}
+	for (const { n, bare } of prose) {
+		for (const m of bare.matchAll(/\]\(#([^)\s]*)\)/g)) {
+			if (!m[1]) {
+				add('error', 'link/anchor-empty', '页内链接缺少锚点', n);
+				continue;
+			}
+			let target = m[1];
+			try {
+				target = decodeURIComponent(m[1]);
+			} catch {
+				/* 非法转义就按原文比对 */
+			}
+			if (!headingIds.has(target))
+				add(
+					'error',
+					'link/anchor-not-found',
+					`页内锚点 #${target} 在本文件里找不到同名标题：改标题或换语言时必须同步链接`,
+					n,
+				);
+		}
 	}
 
 	// Aside 与组件配对
@@ -354,7 +489,10 @@ function lintFile(absPath, repoRoot, forcedType) {
 				add('warn', 'tutorial/alternative', '「或者」暗示分支，Tutorial 里确认是否必要', n);
 			for (const { n } of anyLine(/你将学到|你将学会/))
 				add('error', 'tutorial/presumptuous', '禁止「你将学到」句式，改用「我们将共同构建出…」', n);
-			if (anyLine(/我们/).length === 0)
+			// 第一人称按语言各判一份：英文页里当然没有「我们」，那是译文该有的样子。
+			const FIRST_PERSON = { root: /我们/, en: /\bwe\b|\bour\b/i, ja: /私たち|我々/ };
+			const firstPerson = FIRST_PERSON[locale] ?? FIRST_PERSON.root;
+			if (anyLine(firstPerson).length === 0)
 				add('warn', 'tutorial/first-person', 'Tutorial 应使用第一人称复数「我们」，全文未出现');
 			const stepHeads = head('步骤');
 			if (stepHeads.length > 0 && anyLine(/预期/).length === 0)
@@ -385,8 +523,8 @@ function lintFile(absPath, repoRoot, forcedType) {
 			}
 			for (const { n } of anyLine(/为什么|这是因为|想象一下|举个例子/))
 				add('warn', 'reference/explanation', 'Reference 只陈述事实，解释性内容移到 Explanation', n);
-			for (const { n } of anyLine(/点击|输入命令|执行以下/))
-				add('warn', 'reference/action', 'Reference 不含操作动作，移到 How-to', n);
+			for (const { n } of anyLine(IMPERATIVE_ACTION))
+				add('warn', 'reference/action', 'Reference 不含操作指令，移到 How-to', n);
 			const hasTable = prose.some((p) => /^\s*\|.*\|\s*$/.test(p.text));
 			const hasFieldList = prose.some((p) => /^\s*[*-]\s+\*\*[^*]+\*\*/.test(p.text));
 			if (!hasTable && !hasFieldList)
@@ -401,7 +539,7 @@ function lintFile(absPath, repoRoot, forcedType) {
 				else if (fence.length > 8)
 					add('warn', 'explanation/code-long', `代码块 ${fence.length} 行，Explanation 只允许极简引用`, fence.start + 1);
 			}
-			for (const { n } of anyLine(/点击|输入命令|执行以下命令|第一步/))
+			for (const { n } of anyLine(IMPERATIVE_ACTION))
 				add('error', 'explanation/action', 'Explanation 禁止操作指令', n);
 			if (title) {
 				if (locale === 'root' && !/^(关于|为什么)/.test(title))

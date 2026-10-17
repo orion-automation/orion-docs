@@ -1,0 +1,71 @@
+---
+title: XML の書き出しとシリアライズ
+description: SPIN の XML データ形式で、XML 要素と属性を文字列・Writer・出力ストリームへ書き出します。
+sidebar:
+  order: 3
+---
+
+## 1. 文字列として書き出す
+
+`toString()` は要素を XML テキストにシリアライズします。プロセス変数への保存、ログ出力、メッセージ本文への埋め込みなど、最もよく使う出口です。
+
+```java
+import static org.camunda.spin.Spin.XML;
+
+SpinXmlElement element = XML("<root id=\"test\"/>");
+String xml = element.toString();
+```
+
+属性を単独でシリアライズした場合は、属性名を伴わず値だけが出力されます。
+
+```java
+String value = element.attr("id").value();   // "test"
+```
+
+## 2. Writer へ書き出す
+
+文書が大きい場合や、文字列をもう 1 つ保持したくない場合は、`java.io.Writer` に直接書き出します。
+
+```java
+SpinXmlElement element = XML("<root id=\"test\"/>");
+
+StringWriter writer = new StringWriter();
+element.writeToWriter(writer);
+```
+
+要素と属性のどちらも `writeToWriter` に対応しているため、同じストリームへ続けて書き出せます。
+
+```java
+element.writeToWriter(writer);
+element.attr("id").writeToWriter(writer);
+```
+
+## 3. 出力ストリームへ書き出す
+
+`writeToWriter` が受け取るのは文字ストリームです。バイトストリームはラップし、文字コードを明示してください。
+
+```java
+OutputStreamWriter outputStreamWriter = new OutputStreamWriter(System.out);
+element.writeToWriter(outputStreamWriter);
+outputStreamWriter.write("\n");
+outputStreamWriter.close();
+```
+
+文字コードは必ず明示します。省略するとプラットフォーム既定になり、非 ASCII 文字の出力が環境ごとに変わります。
+
+## 4. 出力結果の扱い
+
+| 項目 | 動作 |
+| :--- | :--- |
+| インデント | 整形されません。解析時の構造がそのまま出ます |
+| 宣言 | `<?xml ... ?>` 宣言は自動付与されません |
+| 名前空間 | 既存のプレフィックスと URI 宣言が保持されます |
+| 文字コード | 渡した文字ストリームによって決まります |
+| 空要素 | 自己終了形式で出力されます |
+
+受け側がバイト単位で比較する場合、シリアライザの既定動作に頼らず、業務コード側で正規化してください。
+
+## 5. 関連ページ
+
+- 属性と子要素の変更：[XML の要素と属性の操作](/ja/reference/spin/xml/manipulating/)
+- オブジェクトをそのまま XML にする：[XML のオブジェクトマッピング](/ja/reference/spin/xml/mapping/)

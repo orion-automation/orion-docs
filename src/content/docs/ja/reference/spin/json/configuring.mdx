@@ -1,0 +1,97 @@
+---
+title: JSON 処理の設定
+description: JSON 処理が使うオブジェクトマッパーを置き換え、解析、シリアライズ、マッピングの挙動を調整するためのインターフェースリファレンス。
+sidebar:
+  order: 5
+---
+
+## 1. 概要
+
+SPIN は JSON の解析、シリアライズ、マッピングに Jackson を使います。JSON データ形式は `com.fasterxml.jackson.databind.ObjectMapper` のインスタンスを保持しており、厳格さ、未知の項目の扱い、出力の整形などをこれが決めています。
+
+挙動を変えるには、データ形式のコンフィギュレーターを実装し、その中でオブジェクトマッパーを置き換えます。
+
+| 項目 | 値 |
+| :--- | :--- |
+| データ形式のクラス | `org.camunda.spin.impl.json.jackson.format.JacksonJsonDataFormat` |
+| コンフィギュレーターのインターフェース | `org.camunda.spin.spi.DataFormatConfigurator` |
+| 登録先のファイル | `META-INF/services/org.camunda.spin.spi.DataFormatConfigurator` |
+| 置き換える対象 | `com.fasterxml.jackson.databind.ObjectMapper` |
+
+## 2. 必要になる場面
+
+| 状況 | 必要な調整 |
+| :--- | :--- |
+| ペイロードに宣言していない項目がある | 未知の項目で失敗する設定を切り、Java オブジェクトへのマッピングで例外にならないようにします |
+| 日付の形式がそろっていない | マッパーに日付の形式とタイムゾーンを指定します |
+| 厳密でない JSON を受け入れる必要がある | 解析の設定を緩めます |
+| 出力を人が読めるようにしたい | インデント付きの出力を有効にします |
+| 特定の項目を無視したい | 無視の規則を設定します |
+
+## 3. コンフィギュレーターの実装
+
+コンフィギュレーターが答えるのは二つです。どのデータ形式を引き受けるか、そして何を変えるか。`DataFormatConfigurator` を実装すると、二つのメソッドがそれぞれに対応します。
+
+```java
+package com.example.spin;
+
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import org.camunda.spin.impl.json.jackson.format.JacksonJsonDataFormat;
+import org.camunda.spin.spi.DataFormatConfigurator;
+
+public class JsonDataFormatConfigurator
+    implements DataFormatConfigurator<JacksonJsonDataFormat> {
+
+  public Class<JacksonJsonDataFormat> getDataFormatClass() {
+    return JacksonJsonDataFormat.class;
+  }
+
+  public void configure(JacksonJsonDataFormat dataFormat) {
+    ObjectMapper mapper = new ObjectMapper();
+    // ペイロードに余分な項目があってもマッピングは失敗しない
+    mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    // 変数の画面で読みやすいよう、インデント付きでシリアライズする
+    mapper.enable(SerializationFeature.INDENT_OUTPUT);
+
+    dataFormat.setObjectMapper(mapper);
+  }
+}
+```
+
+`setObjectMapper` は設定を重ねるのではなく、マッパーを丸ごと差し替えます。既定のマッパーが提供していた設定（日付の形式やモジュールの登録など）は引き継がれないため、新しいインスタンスで改めて指定します。
+
+## 4. よく使う設定
+
+| 設定 | 効果 |
+| :--- | :--- |
+| `FAIL_ON_UNKNOWN_PROPERTIES` | 逆シリアライズで未知の項目があったときに失敗するか。既定は有効で、切ると相手側が追加した項目を受け入れます |
+| `INDENT_OUTPUT` | シリアライズ結果にインデントを付けるか。読みやすさだけで、意味は変わりません |
+| `WRITE_DATES_AS_TIMESTAMPS` | 日付をタイムスタンプで書くか。切ると ISO 8601 の文字列になります |
+| `ACCEPT_SINGLE_VALUE_AS_ARRAY` | 単一の値を要素一つの配列として読めるようにするか |
+| `DateFormat` | 日付の解析と出力に使う形式とタイムゾーン |
+| `PropertyNamingStrategy` | Java の項目名と JSON のキーの対応規則（スネークケースからキャメルケースへなど） |
+
+設定は Jackson のもので、完全な一覧はその公式ドキュメントが基準です。
+
+## 5. コンフィギュレーターの登録
+
+データ形式のコンフィギュレーターは SPI で検出されます。プロジェクトのリソースディレクトリに `META-INF/services/org.camunda.spin.spi.DataFormatConfigurator` を作り、コンフィギュレータークラスの完全修飾名を書きます。
+
+```
+com.example.spin.JsonDataFormatConfigurator
+```
+
+クラスパスに複数のコンフィギュレーターがある場合、エンジンは同じデータ形式に対して順に呼び出し、最後に設定されたマッパーが有効になります。複数併存させるときは、互いに上書きしない順序であることを確認します。
+
+## 6. 影響範囲と制約
+
+| 項目 | 説明 |
+| :--- | :--- |
+| 適用範囲 | そのエンジン上のすべてのプロセスの JSON 処理。プロセスやアプリによる区別はありません |
+| 保存済みデータへの影響 | 変わるのは以後の解析とシリアライズだけです。永続化済みの変数は書き換えられず、読み戻すときに新しい設定で解析されます |
+| 厳格さを緩める代償 | 未知の項目の検査を切ると、項目名の打ち間違いも報告されず、黙って無視されます |
+| インデント出力の代償 | 出力が大きくなり、履歴や変数の表がより多くの容量を使います |
+| 重ねるのではなく置き換え | `setObjectMapper` はマッパー全体を差し替えるため、既定の設定は改めて宣言します |
+| XML には影響しない | XML の処理には独自のデータ形式とコンフィギュレーターがあります |

@@ -1,0 +1,97 @@
+---
+title: 配置 JSON 处理
+description: 通过数据格式配置器替换 JSON 处理所用的对象映射器，调整解析、序列化与映射行为的接口参考。
+sidebar:
+  order: 5
+---
+
+## 1. 概述
+
+SPIN 处理 JSON 时用 Jackson 完成解析、序列化与对象映射。JSON 数据格式内部持有一个 `com.fasterxml.jackson.databind.ObjectMapper` 实例，它决定了严格程度、未知字段的处理方式、输出格式等行为。
+
+要改变这些行为，需要实现一个数据格式配置器，在该配置器里替换这个对象映射器。
+
+| 项 | 值 |
+| :--- | :--- |
+| 数据格式类 | `org.camunda.spin.impl.json.jackson.format.JacksonJsonDataFormat` |
+| 配置器接口 | `org.camunda.spin.spi.DataFormatConfigurator` |
+| 注册位置 | `META-INF/services/org.camunda.spin.spi.DataFormatConfigurator` |
+| 被替换的对象 | `com.fasterxml.jackson.databind.ObjectMapper` |
+
+## 2. 适用场景
+
+| 场景 | 需要的调整 |
+| :--- | :--- |
+| 报文含未声明的字段 | 关闭「未知字段即失败」，否则映射到 Java 对象时抛异常 |
+| 日期格式不统一 | 为映射器指定日期格式与时区 |
+| 需要容忍非严格 JSON | 放宽解析特性 |
+| 希望输出便于人工查看 | 开启缩进输出 |
+| 需要忽略特定字段 | 配置忽略规则 |
+
+## 3. 实现配置器
+
+配置器需要回答两件事：接管哪个数据格式，以及怎么改。实现 `DataFormatConfigurator` 接口即可，两个方法分别对应这两件事。
+
+```java
+package com.example.spin;
+
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import org.camunda.spin.impl.json.jackson.format.JacksonJsonDataFormat;
+import org.camunda.spin.spi.DataFormatConfigurator;
+
+public class JsonDataFormatConfigurator
+    implements DataFormatConfigurator<JacksonJsonDataFormat> {
+
+  public Class<JacksonJsonDataFormat> getDataFormatClass() {
+    return JacksonJsonDataFormat.class;
+  }
+
+  public void configure(JacksonJsonDataFormat dataFormat) {
+    ObjectMapper mapper = new ObjectMapper();
+    // 报文里多出来的字段不再导致映射失败
+    mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    // 序列化结果带缩进，便于在变量详情里直接阅读
+    mapper.enable(SerializationFeature.INDENT_OUTPUT);
+
+    dataFormat.setObjectMapper(mapper);
+  }
+}
+```
+
+`setObjectMapper` 替换的是整个映射器，不是在上面叠加设置。因此原来由默认映射器提供的配置（例如日期格式、模块注册）不会自动继承，需要在新实例上重新给出。
+
+## 4. 常见配置项
+
+| 配置项 | 作用 |
+| :--- | :--- |
+| `FAIL_ON_UNKNOWN_PROPERTIES` | 反序列化遇到未知字段时是否失败。默认开启，关闭后可容忍对端新增字段 |
+| `INDENT_OUTPUT` | 序列化是否带缩进。只影响可读性，不改变语义 |
+| `WRITE_DATES_AS_TIMESTAMPS` | 日期是否写成时间戳。关闭后写成 ISO 8601 字符串 |
+| `ACCEPT_SINGLE_VALUE_AS_ARRAY` | 单个值是否可当作单元素数组读取 |
+| `DateFormat` | 指定解析与输出日期所用的格式与时区 |
+| `PropertyNamingStrategy` | 字段名与 JSON 键名之间的转换规则，例如下划线转驼峰 |
+
+配置项来自 Jackson，完整清单以其官方文档为准。
+
+## 5. 注册配置器
+
+数据格式配置器通过 SPI 发现。在项目的资源目录下新增文件 `META-INF/services/org.camunda.spin.spi.DataFormatConfigurator`，写入配置器类的全限定名：
+
+```
+com.example.spin.JsonDataFormatConfigurator
+```
+
+类路径上有多份配置器时，引擎会依次对同一个数据格式调用它们，最终生效的是最后一次替换的映射器。因此多个配置器同时存在时，需要确认它们的先后顺序不会互相覆盖。
+
+## 6. 影响范围与约束
+
+| 项 | 说明 |
+| :--- | :--- |
+| 生效范围 | 该引擎上所有进程的 JSON 处理，不区分流程与应用 |
+| 对已存数据的影响 | 只改变后续的解析与序列化。已持久化的变量不会被重写，读回时按新配置解析 |
+| 严格程度放宽的代价 | 关闭未知字段检查后，拼错的字段名不会报错，只会被静默忽略 |
+| 缩进输出的代价 | 输出体积变大，写入历史与变量表时占用更多空间 |
+| 替换而非叠加 | `setObjectMapper` 换掉整个映射器，默认配置需要重新声明 |
+| 不覆盖 XML | XML 处理有独立的数据格式与配置器，两者互不影响 |

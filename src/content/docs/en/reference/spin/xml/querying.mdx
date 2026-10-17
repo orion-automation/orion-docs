@@ -1,0 +1,114 @@
+---
+title: Querying XML
+description: Query elements, attributes, strings, numbers and booleans in SPIN XML objects with XPath 1.0.
+sidebar:
+  order: 4
+---
+
+## 1. Query types
+
+`xPath(expression)` returns a query object; pick the result type you want from it. The XPath version is **1.0**, so 2.0 functions and syntax are not available.
+
+| Wanted result | Call | Return type |
+| :--- | :--- | :--- |
+| One element | `xPath(...).element()` | `SpinXmlTreeElement` |
+| Element list | `xPath(...).elementList()` | `SpinList<SpinXmlTreeElement>` |
+| One attribute | `xPath(...).attribute()` | `SpinXmlTreeAttribute` |
+| Attribute list | `xPath(...).attributeList()` | `SpinList<SpinXmlTreeAttribute>` |
+| String | `xPath(...).string()` | `String` |
+| Number | `xPath(...).number()` | `Double` |
+| Boolean | `xPath(...).bool()` | `Boolean` |
+
+### 1.1 Querying an element
+
+```java
+import static org.camunda.spin.Spin.XML;
+
+String xml = "<root><child><a>foo</a></child><child><a>bar</a></child></root>";
+
+SpinXmlTreeElement child = XML(xml).xPath("/root/child").element();
+```
+
+### 1.2 Querying an element list
+
+```java
+SpinList<SpinXmlTreeElement> elements = XML(xml).xPath("/root/child/a").elementList();
+```
+
+### 1.3 Querying an attribute
+
+```java
+String xml = "<root><child id=\"1\"><a>foo</a></child></root>";
+
+SpinXmlTreeAttribute attribute = XML(xml).xPath("/root/child/@id").attribute();
+String id = attribute.value();
+```
+
+### 1.4 Querying an attribute list
+
+```java
+SpinList<SpinXmlTreeAttribute> attributes = XML(xml).xPath("/root/child/a/@id").attributeList();
+```
+
+### 1.5 Querying strings, numbers and booleans
+
+XPath can compute a value directly; there is no need to fetch an element and convert it.
+
+```java
+String value = XML(xml).xPath("string(/root/child/@id)").string();
+Double count = XML(xml).xPath("count(/root/child/a)").number();
+Boolean exists = XML(xml).xPath("boolean(/root/child)").bool();
+```
+
+## 2. Namespaces
+
+Prefixes used in the expression must be declared on the query. Otherwise no namespaced node will match.
+
+### 2.1 Declaring one prefix
+
+```java
+SpinXmlTreeElement element = XML(xml)
+    .xPath("/root/child")
+    .ns("t", "http://camunda.org")
+    .element();
+```
+
+### 2.2 Declaring several at once
+
+```java
+Map<String, String> namespaces = new HashMap<>();
+namespaces.put("t", "http://camunda.org");
+namespaces.put("u", "http://camunda.org/other");
+
+SpinXmlTreeElement element = XML(xml).xPath("/t:root/u:child").ns(namespaces).element();
+```
+
+### 2.3 The default namespace uses the prefix `DEFAULT`
+
+When the document uses a default namespace (`<root xmlns="...">`), the expression still has to give it a prefix. SPIN's convention is `DEFAULT`.
+
+```java
+String xml = "<root xmlns=\"http://camunda.org\"><child/></root>";
+
+SpinXmlTreeElement element = XML(xml)
+    .xPath("/DEFAULT:root/DEFAULT:child")
+    .ns("DEFAULT", "http://camunda.org")
+    .element();
+```
+
+Writing `/root/child` without declaring the prefix returns nothing. This is the one that catches people on payloads that only ever use a default namespace.
+
+## 3. Constraints
+
+| Item | Note |
+| :--- | :--- |
+| XPath version | 1.0 only |
+| Single results | Methods such as `.element()` return the first match when several nodes match |
+| Empty results | No match yields an empty collection; single-result methods may return `null`, so check first |
+| Prefixes | Must be declared on the query, they are not inferred from the document |
+| Performance | Every `xPath(...)` call re-evaluates; cache results when querying inside a loop |
+
+## 4. Related pages
+
+- Changing what you found: see [Manipulating XML elements and attributes](/en/reference/spin/xml/manipulating/)
+- The same kind of querying for JSON: see [Querying JSON](/en/reference/spin/json/querying/)

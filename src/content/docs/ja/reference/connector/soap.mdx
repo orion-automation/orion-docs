@@ -1,0 +1,202 @@
+---
+title: SOAP コネクタ
+description: SOAP コネクタのパラメータの取り決め、モデラーでの設定、SOAP エンベロープとアクションの書き方、呼び出し方法と制約。
+---
+
+## 1. 概要
+
+SOAP コネクタは、SOAP メッセージを HTTP で Web サービスのエンドポイントへ送ります。HTTP コネクタと同じ系統で、下位の通信実装も共通です。違いはメッセージに対する制約で、メソッドは常に POST、本文は完全な SOAP エンベロープでなければなりません。
+
+識別子は `soap-http-connector` です。HTTP コネクタの `http-connector` とは別の実装で、パッケージも別の依存に分かれています。実行環境に SOAP コネクタが無い場合、この識別子では実装を取得できません。デプロイは成功し、最初の実行で初めて失敗します。
+
+## 2. モデラーでの使い方
+
+SOAP コネクタは**サービスタスク**または**送信タスク**に載せます。画面上で設定した内容は、最終的にエンジンが実行時に評価する入力パラメータと出力パラメータの組になります。
+
+### 2.1 基本設定
+
+プロパティパネルで二つを宣言します。
+
+| プロパティ | 値 | 説明 |
+| :--- | :--- | :--- |
+| 実装 | コネクタ | これを選んだときだけ、コネクタの入力と出力の表が現れます |
+| コネクタ ID | `soap-http-connector` | `http-connector` を書くと HTTP コネクタとして実行され、エンベロープとアクションの制約は働きません |
+
+### 2.2 入力パラメータ
+
+| 名前 | 型 | 必須 | 説明 |
+| :--- | :--- | :--- | :--- |
+| `url` | 文字列 | はい | サービスエンドポイントのアドレス。`${…}` 式に対応します |
+| `payload` | テキストまたはスクリプト | はい | 完全な SOAP エンベロープ。無い場合や空白だけの場合はリクエストが送られず、そのまま失敗します |
+| `headers` | マップ | いいえ | リクエストヘッダー。SOAP アクションと内容タイプの両方をここに書きます |
+| `method` | 文字列 | いいえ | 常に POST です。別の値を書いても実際のリクエストは変わらず、実行前に POST に戻されます |
+
+`soapAction` という独立した入力パラメータはありません。アクションは `headers` の中の `SOAPAction` ヘッダーそのものです。
+
+### 2.3 出力パラメータ
+
+出力パラメータは HTTP コネクタとまったく同じです。レスポンスはいったんコネクタの一時的なコンテキストに置かれ、プロセスには書き戻されません。出力パラメータで取り出し、プロセス変数に名前を付ける必要があります。
+
+| 名前 | 型 | 説明 |
+| :--- | :--- | :--- |
+| `statusCode` | 文字列 | HTTP ステータスコード。SOAP のサーバー側エラーは通常 500 で返ります |
+| `response` | テキストまたはスクリプト | レスポンス本文。**XML の文字列であり、オブジェクトではありません**。項目単位で読むにはまず XML として解析します |
+| `headers` | マップ | レスポンスヘッダー。セッション識別子やキャッシュの方針の読み取りに使えます |
+
+書き方は HTTP コネクタと同じで、左が格納先のプロセス変数、右が評価する式です。たとえば `statusCode` を `soapStatus` に入れます。
+
+### 2.4 コネクタリソースとの関係
+
+設計モジュールのコネクタリソースは現在、HTTP インターフェースと外部タスクの二種類です。SOAP という種類はありません。そのため SOAP の呼び出しは、コネクタリソースを経由せずタスクのパラメータ表に直接設定します。
+
+ここが HTTP コネクタとの違いです。HTTP は再利用できる呼び出し設定をコネクタリソースに一度だけ用意し、複数のタスクに載せられますが、SOAP はタスクごとに書く必要があります。
+
+## 3. 本文と SOAP アクション
+
+### 3.1 エンベロープ
+
+`payload` は `Envelope` から `Envelope` までの完全なエンベロープで、名前空間の宣言と `Body` を含む必要があります。層が欠けていると、たいていは相手側に拒否され、返るエラーはコネクタとは関係のない内容になります。
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope
+  xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+  xmlns:ord="https://example.com/orders">
+  <soapenv:Header/>
+  <soapenv:Body>
+    <ord:GetOrder>
+      <ord:orderId>10086</ord:orderId>
+    </ord:GetOrder>
+  </soapenv:Body>
+</soapenv:Envelope>
+```
+
+エンベロープにはプロセス変数を入れられます。型をスクリプトにして全体を生成するか、テキスト本文に `${…}` を書きます。分岐によってエンベロープの形を変える場合は、スクリプトで生成するほうが手間が少なくて済みます。
+
+### 3.2 アクションと内容タイプ
+
+SOAP 1.1 と SOAP 1.2 ではアクションの書き方が異なり、コネクタが版を判断してくれることはありません。両方のヘッダーを自分で正しく書きます。
+
+| 版 | 内容タイプ | アクション |
+| :--- | :--- | :--- |
+| SOAP 1.1 | `text/xml; charset=utf-8` | 独立した `SOAPAction` ヘッダー。値は引用符で囲んだ URI |
+| SOAP 1.2 | `application/soap+xml; charset=utf-8` | 内容タイプの `action` パラメータに書く。`SOAPAction` ヘッダーは使いません |
+
+したがって `headers` には通常この二つが入ります。
+
+| 名前 | 値の例 |
+| :--- | :--- |
+| `Content-Type` | `text/xml; charset=utf-8` |
+| `SOAPAction` | `"https://example.com/orders/GetOrder"` |
+
+SOAP 1.2 の場合は `Content-Type` だけにして、アクションをその `action` パラメータに入れます。`SOAPAction` ヘッダーも併せて送ると、相手側に拒否されることがあります。
+
+## 4. 基盤となる HTTP クライアント
+
+SOAP コネクタは HTTP コネクタの通信実装を引き継ぎ、実際のリクエストも Apache HttpClient が送ります。システムプロパティ、パッケージ構成、独自の接続プール、コンフィギュレーターの登録はいずれも HTTP コネクタと同じです。[HTTP コネクタ](/ja/reference/connector/http/#3-基盤となる-http-クライアント) の該当する章を参照してください。
+
+そのまま引き継がれる機能の一つが、コネクタの設定項目です。リクエストのタイムアウトやエラー時の中断などは、HTTP コネクタと同様に設定できます。
+
+## 5. コネクタを直接呼び出す
+
+Java や独自コンポーネントからは、流れるように書けるインターフェースで直接リクエストを送れます。
+
+### 5.1 リクエストを作成する
+
+```java
+String envelope = "<soapenv:Envelope ...>...</soapenv:Envelope>";
+
+connector.createRequest()
+  .url("https://example.com/orders")
+  .soapAction("https://example.com/orders/GetOrder")
+  .contentType("text/xml; charset=utf-8")
+  .payload(envelope)
+  .execute();
+```
+
+`.soapAction(...)` が行うのは `SOAPAction` リクエストヘッダーを追加することだけで、パラメータ表に自分で書くのと等価です。
+
+### 5.2 リクエストヘッダーを追加する
+
+```java
+HttpResponse response = connector.createRequest()
+  .url("https://example.com/orders")
+  .soapAction("https://example.com/orders/GetOrder")
+  .contentType("text/xml; charset=utf-8")
+  .header("Accept", "text/xml")
+  .payload(envelope)
+  .execute();
+```
+
+### 5.3 設定項目を指定する
+
+```java
+HttpResponse response = connector.createRequest()
+  .url("https://example.com/orders")
+  .contentType("text/xml; charset=utf-8")
+  .payload(envelope)
+  .configOption("throw-http-error", "TRUE")
+  .execute();
+```
+
+設定項目の意味は HTTP コネクタと同じです。
+
+## 6. エラー処理
+
+エラーは二種類あり、扱いが異なります。
+
+| 種類 | 起きる時点 | 既定の動作 |
+| :--- | :--- | :--- |
+| リクエスト自体が不正 | 送信前：エンベロープが空、メソッドが POST 以外 | 例外になり、リクエストは送られません |
+| サーバーがエラーを返す | 4XX や 5XX のレスポンス | **例外は投げません**。ステータスコードと本文がそのまま返ります |
+
+SOAP のサーバー側エラーは通常、ステータス 500 の `Fault` メッセージです。既定ではプロセスは止まらず、続けるかどうかは後続のゲートウェイが判断します。`statusCode` を読むか `response` を解析して決めます。
+
+こうしたエラーで経路を止めたい場合は、設定項目 `throw-http-error` を `TRUE` にします。同じ設定はモデラーで入力パラメータ `throw-http-error` として与えることもでき、有効にするとタスクに付けたエラー境界イベントが動きます。
+
+## 7. レスポンス処理
+
+レスポンスオブジェクトは、ステータスコード、ヘッダー、本文の三つを持ちます。
+
+```java
+Integer statusCode = response.getStatusCode();
+String contentType = response.getHeader("Content-Type");
+String body = response.getResponse();
+```
+
+本文は XML の文字列なので、項目単位で取り出す前に解析が必要です。Java のコードでレスポンスを使い終えたら、`response.close()` を呼んで接続を解放します。プロセスでパラメータの対応付けを通して使う場合、解放はエンジンが行います。
+
+## 8. 汎用インターフェース
+
+流れるようなメソッドのほかに、名前でパラメータを渡す汎用インターフェースがあります。名前も意味も HTTP コネクタと同じです。モデラーの入力・出力パラメータの表は、内部的にこのインターフェースを使っています。
+
+### 8.1 リクエストパラメータを設定する
+
+```java
+SoapHttpRequest request = connector.createRequest();
+request.setRequestParameter("url", "https://example.com/orders");
+request.setRequestParameter("payload", envelope);
+request.setRequestParameter("headers", headers);
+```
+
+### 8.2 レスポンスパラメータを読み取る
+
+```java
+response.getResponseParameter("statusCode");
+response.getResponseParameter("headers");
+response.getResponseParameter("response");
+```
+
+## 9. 制約と前提
+
+| 制約 | 説明 |
+| :--- | :--- |
+| 独立した依存 | SOAP コネクタは HTTP コネクタとは別に配布されます。無い場合、識別子で実装を取得できず、症状はデプロイ時ではなく最初の実行時に現れます |
+| POST のみ | 別のメソッドが必要な場面ではこのコネクタを使えません。別のメソッドを書いても効果がなく、直接呼び出す場合は例外になります |
+| エンベロープ必須 | `payload` が空、または空白だけの場合はリクエストが送られません。空の SOAP 操作でも `Body` を持つエンベロープが必要です |
+| 専用のアクションパラメータが無い | アクションはヘッダー一本だけで、SOAP 1.1 と 1.2 の書き方をコネクタが切り替えることはありません |
+| 内容タイプは検査しない | `Content-Type` を補うことはありません。無い場合や版が違う場合、相手側は 415 や 500 を返すのが一般的です |
+| エラーは既定では止めない | 500 の `Fault` は通常のレスポンスとして返ります。`throw-http-error` を有効にしない限り例外になりません |
+| 項目単位の出力は自前で解析 | コネクタが返すのは本文の文字列だけで、XML の取り出し機能は内蔵していません |
+| サービス基底 URL という考え方がない | 完全なアドレスしか受け取りません。環境ごとにホストを切り替えるには `url` でプロセス変数を参照します |
+| コネクタリソースは SOAP 非対応 | 設計モジュールのコネクタリソースは HTTP と外部タスクのみで、SOAP はタスクごとに設定します |

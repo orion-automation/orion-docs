@@ -1,0 +1,65 @@
+---
+title: Configuring XML handling
+description: Change SPIN XML parsing, serialization and mapping through secure parsing options and component replacement.
+sidebar:
+  order: 6
+---
+
+## 1. What can be configured
+
+The XML data format is built on JAXB and DOM. Parsing, serialization and mapping are each handled by a separate object, and each can be replaced.
+
+| Object | Responsibility |
+| :--- | :--- |
+| `javax.xml.parsers.DocumentBuilderFactory` | Parsing XML documents |
+| `javax.xml.transform.TransformerFactory` | Serializing output |
+| `javax.xml.bind.JAXBContext` | Mapping to and from objects |
+
+The data format class to register a configurator for is `org.camunda.spin.impl.xml.dom.format.DomXmlDataFormat`. Its instances expose setters that replace the defaults listed above.
+
+The configuration mechanism itself is shared with the other data formats; see [Extending SPIN](/en/reference/spin/extending/).
+
+## 2. Secure parsing
+
+The two classic XML risks are external entity injection (XXE) and resource exhaustion at the parser level. SPIN exposes a switch for each.
+
+| Option | Description | Default |
+| :--- | :--- | :--- |
+| `xxe-processing` | Whether external XML entities are processed. Disabling it prevents XXE attacks | `false` |
+| `secure-processing` | Whether the parser's secure processing mode is enabled | `true` |
+
+The defaults sit on the safe side: external entities are not processed, and secure processing is on. Only turn `xxe-processing` on when the payload source is trusted and the document genuinely depends on external entities.
+
+### 2.1 Passing custom options
+
+Options go to `DataFormats.loadDataFormats(...)` as a `Map`.
+
+```java
+Map<String, Object> configurationOptions = new HashMap<>();
+configurationOptions.put("xxe-processing", true);
+configurationOptions.put("secure-processing", false);
+
+DataFormats.loadDataFormats(classloader, configurationOptions);
+```
+
+Note that the snippet above **relaxes both switches at once**. Use it only in an isolated environment or for a specific compatibility need; production normally keeps the defaults.
+
+## 3. Replacing the JAXB context
+
+An application can implement `org.camunda.spin.spi.DataFormatConfigurator` and supply its own `JAXBContext`.
+
+SPIN caches whatever context it is given. Configuration therefore applies once, at load time, and is not rebuilt at runtime — changing it means reloading the data formats.
+
+## 4. Scope of the change
+
+| Item | Note |
+| :--- | :--- |
+| Reach | The whole data format instance, not one call site |
+| Timing | When the data formats are loaded |
+| Security impact | Turning off `secure-processing` weakens protection; assess before doing it |
+| Mapping impact | Replacing the `JAXBContext` affects both mapping and serialization |
+
+## 5. Related pages
+
+- The extension mechanism itself: see [Extending SPIN](/en/reference/spin/extending/)
+- The JSON equivalent: see [Configuring JSON handling](/en/reference/spin/json/configuring/)

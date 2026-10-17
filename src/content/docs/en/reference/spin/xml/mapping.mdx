@@ -1,0 +1,74 @@
+---
+title: Mapping XML to objects
+description: Map XML to Java objects and back with the SPIN XML data format, with or without JAXB annotations.
+sidebar:
+  order: 5
+---
+
+## 1. How mapping works
+
+SPIN folds mapping into the same fluent API: XML can be mapped to a Java object, and a Java object can be serialized back to XML.
+
+The serialization itself is JAXB's job. JAXB annotations on your classes control element names, namespaces and similar details, but **annotations are optional** — without them, class and field names are used.
+
+## 2. XML to Java
+
+### 2.1 Define the target class
+
+```java
+@XmlRootElement(name = "customer", namespace = "http://camunda.org/test")
+public class Customer {
+
+  private String name;
+
+  @XmlElement(namespace = "http://camunda.org/test")
+  public String getName() {
+    return name;
+  }
+
+  public void setName(String name) {
+    this.name = name;
+  }
+}
+```
+
+`@XmlRootElement` declares the root element name and namespace, `@XmlElement` maps a field. The namespaces have to match the payload; if they do not, you get an empty result rather than an error.
+
+### 2.2 Run the mapping
+
+```java
+import static org.camunda.spin.Spin.XML;
+
+String xmlInput = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+    + "<customer xmlns=\"http://camunda.org/example\"><name>Kermit</name></customer>";
+
+Customer customer = XML(xmlInput).mapTo(Customer.class);
+```
+
+`mapTo` hands you the finished object — no querying, no field-by-field extraction.
+
+## 3. Java to XML
+
+```java
+String xml = XML(customer).toString();
+```
+
+`XML(object)` wraps the Java object as an XML element; output it with any of the methods in [Writing and serializing XML](/en/reference/spin/xml/writing/).
+
+## 4. Annotations and constraints
+
+| Item | Note |
+| :--- | :--- |
+| Are annotations required | No; without them element names come from class and field names |
+| Namespaces | A mismatch between the class annotation and the payload means values are not read |
+| Null values | Fields that are `null` produce no element by default |
+| Collection fields | Need `@XmlElementWrapper` plus `@XmlElement` for the expected nesting |
+| Type support | JAXB rules apply: a no-argument constructor and accessible accessors are required |
+| Performance | The mapping context is cached, so mapping the same type repeatedly does not rebuild it |
+
+To replace the JAXB context or change security settings, see [Configuring XML handling](/en/reference/spin/xml/configuring/).
+
+## 5. Related pages
+
+- Editing nodes directly instead of mapping: see [Manipulating XML elements and attributes](/en/reference/spin/xml/manipulating/)
+- The JSON equivalent: see [Mapping JSON to objects](/en/reference/spin/json/mapping/)

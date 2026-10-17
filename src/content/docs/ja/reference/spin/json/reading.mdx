@@ -1,0 +1,357 @@
+---
+title: JSON データの操作
+description: SPIN データ形式で JSON オブジェクトと配列を読み取り、取り出し、設定、操作するためのインターフェースリファレンス。
+sidebar:
+  order: 1
+---
+
+## 1. JSON データの読み取り
+
+SPIN データ形式は、文字列または文字ストリームから JSON を読み取って解析します。
+
+### 1.1 文字列から読み取る
+
+Java では、次のグローバルな静的メソッドで標準の JSON 文字列をエンジンが扱えるオブジェクトに変換します。
+
+* **形式を明示する**: `S()` メソッドに `json()` を渡し、対象が JSON であることを伝えます。
+
+```java
+  import static org.camunda.spin.Spin.*;
+  import static org.camunda.spin.DataFormats.*;
+
+  SpinJsonNode json = S("{\"customer\": \"Kermit\"}", json());
+
+```
+
+* **ショートカット関数**: `JSON()` で直接解析します。
+```java
+import static org.camunda.spin.Spin.*;
+
+SpinJsonNode json = JSON("{\"customer\": \"Kermit\"}");
+
+```
+
+
+* **プリミティブ値**: JSON のプリミティブを表す文字列は、そのプリミティブとして読み取られます。たとえば `JSON("true")` は真偽値 `true` を持つ `SpinJsonNode` を返します。
+
+### 1.2 文字ストリームから読み取る
+
+SPIN は `java.io.Reader` から直接 JSON を読み取れます。
+
+* **API**: `S(reader, json())` または `JSON(reader)`。
+* **ファイルからの読み取り**:
+```java
+import static org.camunda.spin.Spin.*;
+
+FileInputStream fis = new FileInputStream("/tmp/customer.json");
+InputStreamReader reader = new InputStreamReader(fis, "utf-8");
+SpinJsonNode json = JSON(reader);
+
+```
+
+
+
+### 1.3 スクリプト言語から読み取る
+
+JavaScript などのスクリプト言語でも読み取り方は同じです。スクリプト言語は動的な型付けなので形式の指定は不要で、エンジンが自動で判別します。
+
+* **JavaScript の例**:
+```javascript
+var customer = S('{"customer": "Kermit"}');
+
+```
+
+
+
+## 2. JSON プロパティの読み取り
+
+JSON ツリーから特定のプロパティを取り出すには `.prop("name")` を使います。`SpinJsonNode` が返るので、そこから値を読み取ります。
+
+### 2.1 Java の例
+
+```java
+import static org.camunda.spin.Spin.*;
+
+SpinJsonNode json = JSON("{\"customer\": \"Kermit\"}");
+SpinJsonNode customerProperty = json.prop("customer");
+String customerName = customerProperty.stringValue();
+
+```
+
+### 2.2 JavaScript の例
+
+```javascript
+var json = S('{"customer": "Kermit"}');
+var customerProperty = json.prop("customer");
+var customerName = customerProperty.value();
+
+```
+
+## 3. 値の型と型チェック
+
+SPIN には、`SpinJsonNode` を Java のネイティブ型に変換するメソッドがいくつかあり、いずれも変換時に型を検査します。
+
+### 3.1 ネイティブ値の取り出し
+
+* **`value()`**: 文字列、真偽値、数値、null のプロパティに対応する Java の値。オブジェクトや配列に対して呼ぶと例外になります。
+* **`stringValue()`**: 値を Java の文字列として返します。文字列でない場合は例外になります。
+* **`numberValue()`**: 値を Java の数値として返します。数値でない場合は例外になります。
+* **`boolValue()`**: 値を Java の真偽値として返します。真偽値でない場合は例外になります。
+
+### 3.2 ノード型の確認
+
+現在のノードの基になる型を調べるメソッドです。いずれも真偽値を返します。
+
+* `isObject()`
+* `hasProp()`
+* `isBoolean()`
+* `isNumber()`
+* `isString()`
+* `isNull()`
+* `isValue()`
+* `isArray()`
+* **JavaScript の例**:
+```javascript
+var json = S('{"over18":false}');
+json.prop('over18').isBoolean() // true を返す
+
+```
+
+
+
+## 4. 配列データの取り出し
+
+プロパティが配列の場合、そのノードの下にあるすべての要素を取り出せます。
+
+### 4.1 Java の例
+
+`.elements()` は配列を `SpinList` に変換します。
+
+```java
+import static org.camunda.spin.Spin.*;
+
+SpinJsonNode json = JSON("{\"customer\": [\"Kermit\", \"Waldo\"]}");
+SpinJsonNode customerProperty = json.prop("customer");
+SpinList customers = customerProperty.elements();
+
+SpinJsonNode customer = customers.get(0);
+String customerName = customer.stringValue();
+
+```
+
+### 4.2 JavaScript の例
+
+```javascript
+var json = S('{"customer": ["Kermit", "Waldo"]}');
+var customerProperty = json.prop("customer");
+
+var customers = customerProperty.elements();
+var customer = customers.get(0);
+var customerName = customer.value();
+
+```
+
+## 5. フィールド名の取得
+
+`.fieldNames()` は、ノードの子ノードとプロパティの名前をすべて返します。
+
+### 5.1 Java の例
+
+```java
+import static org.camunda.spin.Spin.*;
+
+SpinJsonNode json = JSON("{\"customer\": [\"Kermit\", \"Waldo\"]}");
+ArrayList fieldNames = json.fieldNames();
+String fieldName1 = fieldNames.get(0);
+
+```
+
+### 5.2 JavaScript の例
+
+```javascript
+var json = S('{"customer": ["Kermit", "Waldo"]}');
+var fieldNames = json.fieldNames();
+var fieldName1 = fieldNames.get(0);
+
+```
+
+## 6. JSON プロパティの設定
+
+`.prop("name", object)` で JSON ノードのプロパティを設定または更新します。
+
+### 6.1 単純型
+
+* **文字列**: `.prop("name", "Waldo")`
+* **整数**: `.prop("age", 42)`
+* **長整数**: `.prop("period", 4200000000)`
+* **小数**: `.prop("price", 42.00)`
+* **真偽値**: `.prop("active", true)`
+
+### 6.2 コンテナ型
+
+配列とオブジェクトも渡せます。
+
+* **配列の設定**:
+* **Java**:
+```java
+SpinJsonNode json = JSON("{\"customer\": [\"Kermit\", \"Waldo\"]}");
+ArrayList<Object> list = new ArrayList<Object>();
+list.add("new entry");
+list.add("new entry2");
+json.prop("new_array", list);
+
+```
+
+
+* **JavaScript**:
+```javascript
+var json = S('{"customer": ["Kermit", "Waldo"]}');
+var list = ["new entry", "new entry2"];
+json.prop("new_array", list);
+
+```
+
+
+
+
+* **オブジェクトの設定**:
+* **Java**:
+```java
+SpinJsonNode json = JSON("{\"customer\": [\"Kermit\", \"Waldo\"]}");
+Map<String, Object> object = new HashMap<String, Object>();
+object.put("new_entry", 42);
+object.put("new_entry2", "Yeah!");
+json.prop("new_object", object);
+
+```
+
+
+* **JavaScript**:
+```javascript
+var json = S('{"customer": ["Kermit", "Waldo"]}');
+var object = {
+  "new_entry": 1,
+  "new_entry2": "Yeah!"
+};
+json.prop("new_array", object);
+
+```
+
+
+
+
+
+## 7. JSON プロパティの削除
+
+JSON オブジェクトからプロパティを削除する方法は二つあります。
+
+* `.deleteProp("name")`: 指定した名前のプロパティを一つ削除します。
+* `.deleteProp(<名前のリスト>)`: リストに含まれるプロパティをまとめて削除します。
+
+### 7.1 Java の例
+
+```java
+SpinJsonNode json = JSON("{\"customer\": \"Kermit\", \"language\": \"en\"}");
+List<String> listOfNames = new ArrayList<String>();
+listOfNames.add("customer");
+listOfNames.add("language");
+
+// customer プロパティだけを削除
+json.deleteProp("customer");
+
+// customer と language を削除
+json.deleteProp(listOfNames);
+
+```
+
+### 7.2 JavaScript の例
+
+```javascript
+var json = S('{"customer": ["Kermit", "Waldo"], "language": "en"}');
+var list = ["customer", "en"];
+
+// customer プロパティだけを削除
+json.deleteProp("customer");
+
+// customer と language を削除
+json.deleteProp(list);
+
+```
+
+## 8. JSON 配列の操作
+
+JSON 配列はオブジェクトの並びを表します。SPIN にはそれらを扱うための次のメソッドがあります。
+
+### 8.1 配列の API
+
+* `.indexOf(<オブジェクト>)`: 最初に現れる位置を返します。
+* `.lastIndexOf(<オブジェクト>)`: 最後に現れる位置を返します。
+* `.append(<オブジェクト>)`: リストの末尾に追加します。
+* `.insertAt(<インデックス>, <オブジェクト>)`: 指定した位置に挿入します。
+* `.insertBefore(<検索対象>, <オブジェクト>)`: 検索対象が最初に現れる位置の前に挿入します。
+* `.insertAfter(<検索対象>, <オブジェクト>)`: 検索対象が最初に現れる位置の後に挿入します。
+* `.remove(<オブジェクト>)`: 最初に現れるものを削除します。
+* `.removeLast(<オブジェクト>)`: 最後に現れるものを削除します。
+* `.removeAt(<インデックス>)`: 指定した位置の項目を削除します。
+
+### 8.2 例 1：位置の取得
+
+どちらの例も配列 `{"test-array" : ["testdata1","testdata2",1,2,true,1,false,1]}` を使います。
+
+* **Java**:
+```java
+SpinJsonNode json = JSON("{\"test-array\" : [\"testdata1\",\"testdata2\",1,2,true,1,false,1]}");
+SpinJsonNode list = json.prop("test-array");
+
+Integer i = list.indexOf("testdata2"); // 1
+Integer j = list.lastIndexOf(1);       // 7
+
+```
+
+
+* **JavaScript**:
+```javascript
+var json = S('{"test-array" : ["testdata1","testdata2",1,2,true,1,false,1]}');
+var list = json.prop("test-array");
+
+var i = list.indexOf("testdata2"); // 1
+var j = list.lastIndexOf(1);       // 7
+
+```
+
+
+
+### 8.3 例 2：追加と削除
+
+* **Java**:
+```java
+SpinJsonNode json = JSON("{\"test-array\" : [\"testdata1\",\"testdata2\",1,2,true,1,false,1]}");
+SpinJsonNode list = json.prop("test-array");
+
+list.append("test2"); // 末尾に "test2" が入る
+list.remove("test2"); // "test2" を削除
+
+list.insertAt(1, "test3"); // "testdata2" の前に "test3" が入る
+list.removeAt(1);          // 位置 1 の項目を削除
+
+list.insertBefore(true, "test4"); // "test4" は位置 4
+list.insertAfter(true, 5);        // 5 は位置 6
+
+```
+
+
+* **JavaScript**:
+```javascript
+var json = S('{"test-array" : ["testdata1","testdata2",1,2,true,1,false,1]}');
+var list = json.prop("test-array");
+
+list.append("test2"); // 末尾に "test2" が入る
+list.remove("test2"); // "test2" を削除
+
+list.insertAt(1, "test3"); // "testdata2" の前に "test3" が入る
+list.removeAt(1);          // 位置 1 の項目を削除
+
+list.insertBefore(true, "test4"); // "test4" は位置 4
+list.insertAfter(true, 5);        // 5 は位置 6
+
+```

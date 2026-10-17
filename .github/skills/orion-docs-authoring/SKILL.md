@@ -9,6 +9,51 @@ argument-hint: '[要写的主题] 或 [要审查的文件路径]'
 本仓是 Astro + Starlight 文档站。所有内容文档必须落进 Diátaxis 四型之一，
 **先选型，再动笔**——四型混写是本项目最常见、也最难事后修的问题。
 
+## 第一条：读者不是我们
+
+写任何一句话之前先问：**谁会读这句？** 本仓文档的读者是业务设计者、流程架构师、
+实施人员——**他们不读代码，也不该知道我们用了什么技术**。
+
+| 不要写 | 要写 |
+|---|---|
+| 画布由 `bpmn-js` 提供 | 画布 |
+| 底层基于 Camunda 7 引擎 | 引擎 / ORION 的流程引擎 |
+| 面板宽 440px | 面板宽度固定，随画布自适应上限 |
+| 图标字形为 `cloud_done` | 当前在线版本标识 |
+| 写入 `configJson` / `businessObject` | 作为资源配置信息保存 / 随模型保存 |
+| 数据存在 IndexedDB | 保存在当前浏览器本地 |
+| 从 DOM 移除 | 收纳后不再占位 |
+| 撤销栈 | 撤销历史 |
+
+这条的判据很硬：**用户能不能在界面上看到它。** 看不到的（语言、框架、像素值、
+字段名、接口路径、图标编码）一律不写。技术名哪怕准确也是错的——它回答的是
+「怎么做的」，而 Reference 回答的是「它是什么、能做什么」。
+
+linter 会把 `bpmn-js` / `DOM` / `IndexedDB` / `configJson` 等判为 error，
+把 `Camunda` 与像素值判为 warn。
+
+**例外：`reference/spin/` 与 `reference/connector/` 下的开发者接口参考。**
+这些页面的读者就是写代码的人，`DOM`、`JAXBContext`、`ObjectMapper` 既是公开 API
+（`SpinXmlDomElement`、`setObjectMapper`）也是要查的东西 —— 把它们抹掉反而看不懂。
+linter 的 `DEV_API_PATH` 只豁免 `prose/impl-leak` 一条，其余机械规则照常。
+产品说明（`howto/`、`bestpractices/`、`guides/`）没有任何豁免。
+
+## 第二条：一种语言写到底
+
+不要中英对照。章节标题、字段名、正文一律只用当前语言：
+
+| 不要写 | 要写 |
+|---|---|
+| `## 1. 描述 (Description)` | `## 1. 描述` |
+| `建模托盘 (Palette)` | `建模托盘` |
+| `业务流程 (Process) 资产` | `业务流程资产` |
+
+只留两类英文：专有名词与格式（BPMN、AI、Markdown、PNG/SVG、`⌘S`），
+以及首次引入的**术语原文**（「协同 (Choreography) 与编排 (Orchestration)」——
+这里英文是术语本身，删了读者对不上行业说法）。
+
+判断口诀：**把括号删掉，句子还成立吗？** 成立就删。
+
 权威全文（面向人的规范，含完整创作 Prompt）：
 `src/content/docs/bestpractices/write{tutorial,howto,reference,explanation}.mdx`。
 本 skill 只抽取其中**可判定、可校验**的部分，并在两者冲突时以那四篇为准。
@@ -71,13 +116,29 @@ argument-hint: '[要写的主题] 或 [要审查的文件路径]'
    - `:::tip` 等 Aside 必须闭合；`<Tabs>` / `<TabItem>` 必须成对
    - Tutorial 禁止分支选项；Explanation 禁止代码块与操作指令
    - How-to 标题以「如何」开头；Explanation 标题以「关于 / 为什么」开头
+   - 引用本章其他小节要写成链接（`详见 [7.4 差异对比](#74-差异对比)`），
+     **不许留裸编号**「详见 7.4」——读者点不动
 4. 泛化占位符一律换成本仓真实路径或真实 slug，不要留 `[Reference Guide](url)`。
+
+### 要多语言版本时
+
+**中文主笔，再逐语言本地化重写**——不逐句对译，也不先写英文。
+
+顺序不是关键，**对着该语言的界面核名词**才是。界面上的词和中文不一样（设计视图 →
+Designer / 設計ビュー），从中文直译出来的英文名用户在界面上找不到。术语来源与已核对
+的对照表见 [本仓约定 · 多语言](./references/repo-conventions.md)。
+
+三条硬要求：
+
+- 标题按该语言重写，`](#锚点)` 全部重算（锚点由标题自动生成，各语言不同）
+- 英文用美式拼写（`color` / `behavior`）
+- 写完把三语文件一起丢给 linter：`link/anchor-not-found` 专门接跨语言复制错的锚点
 
 ## 第四步：校验（必做）
 
 ```bash
 # 机械规则检查（四型硬规则子集）
-node .github/skills/orion-docs-authoring/scripts/lint-diataxis.mjs src/content/docs/howto/design/project.mdx
+node .github/skills/orion-docs-authoring/scripts/lint-diataxis.mjs src/content/docs/howto/build/project.mdx
 
 # 或者整目录
 node .github/skills/orion-docs-authoring/scripts/lint-diataxis.mjs src/content/docs/howto

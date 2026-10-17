@@ -1,0 +1,71 @@
+---
+title: Writing and serializing XML
+description: Output XML elements and attributes to a string, a writer or an output stream with the SPIN XML data format.
+sidebar:
+  order: 3
+---
+
+## 1. To a string
+
+`toString()` serializes an element into XML text. This is the usual exit: storing a process variable, writing a log line, or filling a message body.
+
+```java
+import static org.camunda.spin.Spin.XML;
+
+SpinXmlElement element = XML("<root id=\"test\"/>");
+String xml = element.toString();
+```
+
+Serializing an attribute on its own yields just the value, without the attribute name.
+
+```java
+String value = element.attr("id").value();   // "test"
+```
+
+## 2. To a writer
+
+For large documents, or when you would rather not hold a second copy of the string, write into a `java.io.Writer`.
+
+```java
+SpinXmlElement element = XML("<root id=\"test\"/>");
+
+StringWriter writer = new StringWriter();
+element.writeToWriter(writer);
+```
+
+Both elements and attributes support `writeToWriter`, so you can write several pieces into the same stream.
+
+```java
+element.writeToWriter(writer);
+element.attr("id").writeToWriter(writer);
+```
+
+## 3. To an output stream
+
+`writeToWriter` takes a character stream. A byte stream needs to be wrapped, and the charset named explicitly.
+
+```java
+OutputStreamWriter outputStreamWriter = new OutputStreamWriter(System.out);
+element.writeToWriter(outputStreamWriter);
+outputStreamWriter.write("\n");
+outputStreamWriter.close();
+```
+
+Name the charset. Otherwise the platform default applies and non-ASCII characters come out differently on different machines.
+
+## 4. What the output looks like
+
+| Item | Behavior |
+| :--- | :--- |
+| Indentation | Not beautified; the structure matches what was parsed |
+| Declaration | No `<?xml ... ?>` declaration is added |
+| Namespaces | Existing prefixes and URI declarations are preserved |
+| Encoding | Determined by the character stream you pass in |
+| Empty elements | Written in self-closing form |
+
+If a receiving system compares bytes, normalize the payload in your own code rather than relying on the serializer's defaults.
+
+## 5. Related pages
+
+- Changing attributes and children: see [Manipulating XML elements and attributes](/en/reference/spin/xml/manipulating/)
+- Serializing an object directly: see [Mapping XML to objects](/en/reference/spin/xml/mapping/)

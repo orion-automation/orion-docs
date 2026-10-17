@@ -1,0 +1,202 @@
+---
+title: SOAP connector
+description: Parameters, designer setup, envelope and action headers, direct calls, and constraints of the SOAP connector.
+---
+
+## 1. Overview
+
+The SOAP connector sends SOAP messages to a web service endpoint over HTTP. It shares its origin and its underlying network implementation with the HTTP connector; what differs is the constraint on the message: the method is always POST, and the body must be a complete SOAP envelope.
+
+The connector identifier is `soap-http-connector`. It is a different implementation from the HTTP connector's `http-connector`, packaged in a separate dependency. When the SOAP connector is missing from the runtime, looking it up by that identifier returns nothing — deployment still succeeds, and the failure appears at the first execution.
+
+## 2. Using it in the process designer
+
+The SOAP connector is attached to a **Service task** or a **Send task**. Every item configured in the interface ends up as one of the input and output parameters the engine evaluates at runtime.
+
+### 2.1 Basic configuration
+
+Two declarations are needed in the properties panel:
+
+| Property | Value | Description |
+| :--- | :--- | :--- |
+| Implementation | Connector | Only this choice makes the connector input and output tables appear |
+| Connector ID | `soap-http-connector` | Using `http-connector` runs the HTTP connector instead, and the envelope and action constraints no longer apply |
+
+### 2.2 Input parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `url` | String | Yes | Service endpoint address. Accepts `${…}` expressions |
+| `payload` | Text or script | Yes | The complete SOAP envelope. When it is missing or blank the request is never sent and the task fails outright |
+| `headers` | Map | No | Request headers. Both the SOAP action and the content type go here |
+| `method` | String | No | Always POST. Any other value changes nothing, because it is set back to POST before execution |
+
+There is no separate `soapAction` input parameter. The action is simply a `SOAPAction` header inside `headers`.
+
+### 2.3 Output parameters
+
+Output parameters match the HTTP connector exactly: the response first lands in the connector's temporary context, is not written back to the process, and must be pulled out through an output parameter and given a process variable name.
+
+| Name | Type | Description |
+| :--- | :--- | :--- |
+| `statusCode` | String | HTTP status code. Server-side SOAP errors usually come back as 500 |
+| `response` | Text or script | The response body. **It is an XML string, not an object**: reading individual fields means parsing it as XML first |
+| `headers` | Map | Response headers, useful for session identifiers or cache directives |
+
+The syntax matches the HTTP connector: the left side names the process variable to store into, the right side is the expression to evaluate — for example storing `statusCode` into `soapStatus`.
+
+### 2.4 Relationship to connector resources
+
+Connector resources in the Build module currently cover two kinds, HTTP endpoints and external tasks. There is no SOAP kind, so SOAP calls are configured directly in the parameter tables of each task rather than through a connector resource.
+
+This differs from the HTTP connector: an HTTP call can be maintained once in a reusable connector resource and attached to several tasks, while a SOAP call has to be written out at every task.
+
+## 3. The body and the SOAP action
+
+### 3.1 The envelope
+
+`payload` must be a complete envelope, from `Envelope` to `Envelope`, including namespace declarations and a `Body`. A missing layer is typically rejected by the other side, and the resulting error has nothing to do with the connector.
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope
+  xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+  xmlns:ord="https://example.com/orders">
+  <soapenv:Header/>
+  <soapenv:Body>
+    <ord:GetOrder>
+      <ord:orderId>10086</ord:orderId>
+    </ord:GetOrder>
+  </soapenv:Body>
+</soapenv:Envelope>
+```
+
+The envelope can carry process variables: set the type to script and let it generate the whole envelope, or write `${…}` into a text body. When different branches need differently shaped envelopes, generating it with a script is less work.
+
+### 3.2 Action and content type
+
+SOAP 1.1 and SOAP 1.2 write the action differently, and the connector does not detect the version for you. Both headers have to be right.
+
+| Version | Content type | Action |
+| :--- | :--- | :--- |
+| SOAP 1.1 | `text/xml; charset=utf-8` | A separate `SOAPAction` header whose value is a quoted URI |
+| SOAP 1.2 | `application/soap+xml; charset=utf-8` | Written into the `action` parameter of the content type; the `SOAPAction` header is no longer used |
+
+So `headers` normally holds these two entries:
+
+| Name | Example value |
+| :--- | :--- |
+| `Content-Type` | `text/xml; charset=utf-8` |
+| `SOAPAction` | `"https://example.com/orders/GetOrder"` |
+
+For SOAP 1.2 keep only the `Content-Type` entry and put the action in its `action` parameter; sending a `SOAPAction` header as well may be rejected by the other side.
+
+## 4. Underlying HTTP client
+
+The SOAP connector inherits the network implementation of the HTTP connector, and requests are likewise issued by Apache HttpClient. System properties, the package structure, custom connection pools and configurator registration all work the same way; see the corresponding sections of the [HTTP connector](/en/reference/connector/http/#3-underlying-http-client) reference.
+
+One capability carries over directly: connector configuration options. Request timeouts and error blocking can be set exactly as they are for the HTTP connector.
+
+## 5. Calling the connector directly
+
+From Java or from a custom component, requests can be sent through the fluent interface.
+
+### 5.1 Creating a request
+
+```java
+String envelope = "<soapenv:Envelope ...>...</soapenv:Envelope>";
+
+connector.createRequest()
+  .url("https://example.com/orders")
+  .soapAction("https://example.com/orders/GetOrder")
+  .contentType("text/xml; charset=utf-8")
+  .payload(envelope)
+  .execute();
+```
+
+`.soapAction(...)` does one thing: it appends a `SOAPAction` request header. That is equivalent to writing the header yourself in the parameter table.
+
+### 5.2 Adding request headers
+
+```java
+HttpResponse response = connector.createRequest()
+  .url("https://example.com/orders")
+  .soapAction("https://example.com/orders/GetOrder")
+  .contentType("text/xml; charset=utf-8")
+  .header("Accept", "text/xml")
+  .payload(envelope)
+  .execute();
+```
+
+### 5.3 Setting configuration options
+
+```java
+HttpResponse response = connector.createRequest()
+  .url("https://example.com/orders")
+  .contentType("text/xml; charset=utf-8")
+  .payload(envelope)
+  .configOption("throw-http-error", "TRUE")
+  .execute();
+```
+
+The options mean the same as they do for the HTTP connector.
+
+## 6. Error handling
+
+Errors fall into two kinds, handled differently.
+
+| Kind | When it happens | Default behavior |
+| :--- | :--- | :--- |
+| The request itself is invalid | Before sending: empty envelope, method other than POST | An exception is raised and the request is never sent |
+| The server returns an error | On a 4XX or 5XX response | **No exception is raised**; the status code and body are returned as usual |
+
+A server-side SOAP error is usually a `Fault` message with status 500. By default it does not stop the process, and whether to continue is up to the gateway that follows — read `statusCode` or parse `response` to decide.
+
+To make such errors stop the current path, set the configuration option `throw-http-error` to `TRUE`. The same setting can be given in the process designer as the input parameter `throw-http-error`; once enabled, an error boundary event attached to the task is triggered.
+
+## 7. Response handling
+
+The response object exposes the status code, headers and body.
+
+```java
+Integer statusCode = response.getStatusCode();
+String contentType = response.getHeader("Content-Type");
+String body = response.getResponse();
+```
+
+The body is an XML string and has to be parsed before individual fields can be read. Code that consumes the response must call `response.close()` to release the connection; when the connector is used through parameter mapping in a process, the engine handles that.
+
+## 8. Generic interface
+
+Besides the fluent methods, the connector offers a generic interface that takes parameters by name, with the same names and meanings as the HTTP connector. The input and output parameter tables in the process designer are built on exactly this interface.
+
+### 8.1 Setting request parameters
+
+```java
+SoapHttpRequest request = connector.createRequest();
+request.setRequestParameter("url", "https://example.com/orders");
+request.setRequestParameter("payload", envelope);
+request.setRequestParameter("headers", headers);
+```
+
+### 8.2 Reading response parameters
+
+```java
+response.getResponseParameter("statusCode");
+response.getResponseParameter("headers");
+response.getResponseParameter("response");
+```
+
+## 9. Constraints and prerequisites
+
+| Constraint | Description |
+| :--- | :--- |
+| Separate dependency | The SOAP connector ships separately from the HTTP connector. Without it, looking the connector up by identifier returns nothing, and the symptom shows at the first execution rather than at deployment |
+| POST only | Scenarios that need another method cannot use this connector. Writing a different method has no effect, and the fluent call raises an exception |
+| Envelope required | An empty or blank `payload` means the request is never sent. Even an empty SOAP operation needs an envelope with a `Body` |
+| No dedicated action parameter | The action is only a request header; the connector does not switch between the SOAP 1.1 and SOAP 1.2 forms for you |
+| Content type is not checked | The connector will not add `Content-Type`. When it is missing or names the wrong version, the other side commonly answers with 415 or 500 |
+| Errors do not block by default | A 500 `Fault` comes back as an ordinary response unless `throw-http-error` is enabled |
+| Field-level output is up to you | The connector only returns the body as a string; there is no built-in XML extraction |
+| No notion of a service base URL | Only a complete address is accepted. Switching hosts per environment means referencing a process variable in `url` |
+| Connector resources do not cover SOAP | Build connector resources support HTTP endpoints and external tasks only, so a SOAP call is configured task by task |

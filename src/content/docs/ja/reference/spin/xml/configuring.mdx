@@ -1,0 +1,65 @@
+---
+title: XML 処理の設定
+description: SPIN の XML 解析・シリアライズ・マッピングを、安全な解析オプションと基盤コンポーネントの差し替えで調整します。
+sidebar:
+  order: 6
+---
+
+## 1. 設定できる対象
+
+XML データ形式は JAXB と DOM の上に成り立っています。解析・シリアライズ・マッピングはそれぞれ別のオブジェクトが担っており、いずれも差し替え可能です。
+
+| オブジェクト | 役割 |
+| :--- | :--- |
+| `javax.xml.parsers.DocumentBuilderFactory` | XML 文書の解析 |
+| `javax.xml.transform.TransformerFactory` | 出力のシリアライズ |
+| `javax.xml.bind.JAXBContext` | オブジェクトとのマッピング |
+
+コンフィグレータを登録する対象のデータ形式クラスは `org.camunda.spin.impl.xml.dom.format.DomXmlDataFormat` です。このインスタンスが、上記の既定実装を差し替える setter を提供します。
+
+設定の仕組み自体は他のデータ形式と共通です。[SPIN の拡張](/ja/reference/spin/extending/) を参照してください。
+
+## 2. 安全な解析
+
+XML の代表的なリスクは外部エンティティ注入（XXE）と、パーサレベルでのリソース消費です。SPIN はそれぞれにスイッチを用意しています。
+
+| 設定項目 | 説明 | 既定値 |
+| :--- | :--- | :--- |
+| `xxe-processing` | 外部 XML エンティティを処理するか。無効にすると XXE 攻撃を防げます | `false` |
+| `secure-processing` | パーサのセキュア処理モードを有効にするか | `true` |
+
+既定値は安全側にあります。外部エンティティは処理せず、セキュア処理は有効です。`xxe-processing` を有効にするのは、ペイロードの出所が信頼でき、かつ外部エンティティに実際に依存している場合に限ってください。
+
+### 2.1 カスタム設定を渡す
+
+設定項目は `Map` として `DataFormats.loadDataFormats(...)` に渡します。
+
+```java
+Map<String, Object> configurationOptions = new HashMap<>();
+configurationOptions.put("xxe-processing", true);
+configurationOptions.put("secure-processing", false);
+
+DataFormats.loadDataFormats(classloader, configurationOptions);
+```
+
+上の例は**2 つのスイッチを同時に緩める**点に注意してください。隔離された環境や明確な互換性要件がある場合に限り、本番では既定値のままにします。
+
+## 3. JAXB コンテキストの差し替え
+
+独自のアプリケーションは `org.camunda.spin.spi.DataFormatConfigurator` を実装し、自前の `JAXBContext` を渡せます。
+
+SPIN は渡されたコンテキストをキャッシュして使います。つまり設定は読み込み時に一度だけ適用され、実行時に再構築されることはありません。設定を変えるにはデータ形式を読み込み直す必要があります。
+
+## 4. 影響範囲
+
+| 項目 | 説明 |
+| :--- | :--- |
+| 適用範囲 | 呼び出し箇所単位ではなく、データ形式インスタンス全体 |
+| 適用時期 | データ形式の読み込み時 |
+| セキュリティへの影響 | `secure-processing` を無効にすると防御が弱まります。事前に評価してください |
+| マッピングへの影響 | `JAXBContext` の差し替えはマッピングとシリアライズの両方に影響します |
+
+## 5. 関連ページ
+
+- 拡張の仕組みそのもの：[SPIN の拡張](/ja/reference/spin/extending/)
+- JSON での同様の設定：[JSON 処理の設定](/ja/reference/spin/json/configuring/)

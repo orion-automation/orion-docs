@@ -1,0 +1,114 @@
+---
+title: XML 查询
+description: 用 XPath 1.0 在 SPIN 的 XML 对象上查询元素、属性、字符串、数值与布尔值的接口参考。
+sidebar:
+  order: 4
+---
+
+## 1. 查询方式
+
+`xPath(表达式)` 返回一个查询对象，再按期望的结果类型取用。XPath 版本是 **1.0**，不支持 2.0 的函数与语法。
+
+| 期望结果 | 调用 | 返回类型 |
+| :--- | :--- | :--- |
+| 单个元素 | `xPath(...).element()` | `SpinXmlTreeElement` |
+| 元素列表 | `xPath(...).elementList()` | `SpinList<SpinXmlTreeElement>` |
+| 单个属性 | `xPath(...).attribute()` | `SpinXmlTreeAttribute` |
+| 属性列表 | `xPath(...).attributeList()` | `SpinList<SpinXmlTreeAttribute>` |
+| 字符串 | `xPath(...).string()` | `String` |
+| 数值 | `xPath(...).number()` | `Double` |
+| 布尔值 | `xPath(...).bool()` | `Boolean` |
+
+### 1.1 查询元素
+
+```java
+import static org.camunda.spin.Spin.XML;
+
+String xml = "<root><child><a>foo</a></child><child><a>bar</a></child></root>";
+
+SpinXmlTreeElement child = XML(xml).xPath("/root/child").element();
+```
+
+### 1.2 查询元素列表
+
+```java
+SpinList<SpinXmlTreeElement> elements = XML(xml).xPath("/root/child/a").elementList();
+```
+
+### 1.3 查询属性
+
+```java
+String xml = "<root><child id=\"1\"><a>foo</a></child></root>";
+
+SpinXmlTreeAttribute attribute = XML(xml).xPath("/root/child/@id").attribute();
+String id = attribute.value();
+```
+
+### 1.4 查询属性列表
+
+```java
+SpinList<SpinXmlTreeAttribute> attributes = XML(xml).xPath("/root/child/a/@id").attributeList();
+```
+
+### 1.5 查询字符串、数值与布尔值
+
+XPath 自身能计算的值不必先取元素再转换。
+
+```java
+String value = XML(xml).xPath("string(/root/child/@id)").string();
+Double count = XML(xml).xPath("count(/root/child/a)").number();
+Boolean exists = XML(xml).xPath("boolean(/root/child)").bool();
+```
+
+## 2. 命名空间
+
+XPath 表达式里的前缀必须在查询上声明，否则带命名空间的节点一个也匹配不到。
+
+### 2.1 声明单个前缀
+
+```java
+SpinXmlTreeElement element = XML(xml)
+    .xPath("/root/child")
+    .ns("t", "http://camunda.org")
+    .element();
+```
+
+### 2.2 一次声明多个前缀
+
+```java
+Map<String, String> namespaces = new HashMap<>();
+namespaces.put("t", "http://camunda.org");
+namespaces.put("u", "http://camunda.org/other");
+
+SpinXmlTreeElement element = XML(xml).xPath("/t:root/u:child").ns(namespaces).element();
+```
+
+### 2.3 默认命名空间用 `DEFAULT` 作为前缀
+
+文档里用的是默认命名空间（`<root xmlns="...">`）时，表达式必须给它一个前缀，SPIN 约定用 `DEFAULT`。
+
+```java
+String xml = "<root xmlns=\"http://camunda.org\"><child/></root>";
+
+SpinXmlTreeElement element = XML(xml)
+    .xPath("/DEFAULT:root/DEFAULT:child")
+    .ns("DEFAULT", "http://camunda.org")
+    .element();
+```
+
+不声明前缀就直接写 `/root/child`，返回为空——这条最容易在只有默认命名空间的报文上踩到。
+
+## 3. 约束
+
+| 项 | 说明 |
+| :--- | :--- |
+| XPath 版本 | 只支持 1.0 |
+| 单个结果 | `.element()` 等取单个结果的方法，在匹配到多个节点时只返回第一个 |
+| 空结果 | 没有匹配时返回空集合；取单个结果可能返回 `null`，调用前先判断 |
+| 命名空间前缀 | 必须在查询对象上声明，不能从文档里自动推导 |
+| 性能 | 每次 `xPath(...)` 都会重新计算，循环里反复查询应缓存结果 |
+
+## 4. 相关文档
+
+- 取到节点后修改属性与子元素：见 [操作 XML 元素与属性](/reference/spin/xml/manipulating/)
+- 用 JSON 做同类查询：见 [JSON 查询](/reference/spin/json/querying/)

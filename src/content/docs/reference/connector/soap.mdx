@@ -1,0 +1,202 @@
+---
+title: SOAP 连接器
+description: SOAP 连接器的参数约定、在流程设计器中的配置、SOAP 信封与动作写法、调用接口与使用限制。
+---
+
+## 1. 概述
+
+SOAP 连接器把 SOAP 报文用 HTTP 发给 Web 服务端点。它与 HTTP 连接器同源、共用同一套底层网络实现，差别在于对报文的约束：方法固定为 POST，请求体必须是一份完整的 SOAP 信封。
+
+连接器标识为 `soap-http-connector`。它和 HTTP 连接器的 `http-connector` 是两个不同的实现，打包也在不同的依赖里；运行环境没有装 SOAP 连接器时，按这个标识取不到实现，部署不会报错，执行时才失败。
+
+## 2. 在流程设计器中使用
+
+SOAP 连接器挂在**服务任务**或**发送任务**上。界面上的每一项配置，最终都变成引擎执行时的一组输入与输出参数。
+
+### 2.1 基础配置
+
+在属性面板中完成两项声明：
+
+| 属性 | 取值 | 说明 |
+| :--- | :--- | :--- |
+| 实现 | 连接器 | 选它，属性面板才会出现连接器的输入与输出两张表 |
+| 连接器 ID | `soap-http-connector` | 写成 `http-connector` 时会按 HTTP 连接器执行，信封与动作的约束都不再生效 |
+
+### 2.2 输入参数
+
+| 名称 | 类型 | 必填 | 说明 |
+| :--- | :--- | :--- | :--- |
+| `url` | 字符串 | 是 | 服务端点地址。支持 `${…}` 表达式 |
+| `payload` | 文本或脚本 | 是 | 完整的 SOAP 信封。缺失或只有空白时请求根本不会发出，直接以失败结束 |
+| `headers` | 映射 | 否 | 请求头。SOAP 动作与内容类型都写在这里 |
+| `method` | 字符串 | 否 | 固定为 POST。写别的值也不会改变实际请求，执行前会被改回 POST |
+
+SOAP 连接器没有单独的 `soapAction` 输入参数。动作就是 `headers` 里的一条 `SOAPAction` 头。
+
+### 2.3 输出参数
+
+输出参数与 HTTP 连接器完全一致：响应先落在连接器的临时上下文里，不写回流程，必须通过输出参数取出并命名为流程变量。
+
+| 名称 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `statusCode` | 字符串 | HTTP 状态码。SOAP 的服务端错误通常以 500 返回 |
+| `response` | 文本或脚本 | 响应体。**它是 XML 字符串，不是对象**：逐字段取值要先按 XML 解析 |
+| `headers` | 映射 | 响应头，可用于读取会话标识或缓存策略 |
+
+写法与 HTTP 连接器相同：左边是存进哪个流程变量，右边是取值表达式，例如把 `statusCode` 存进 `soapStatus`。
+
+### 2.4 与连接器资源的关系
+
+设计模块的连接器资源目前只有 HTTP 接口与外部任务两种类型，没有 SOAP 类型。因此 SOAP 调用直接在任务的参数表里配置，不经过连接器资源。
+
+这一点和 HTTP 连接器不同：HTTP 可以在连接器资源里维护一份可复用的调用配置，再挂到多个任务上；SOAP 每处都要自己写一份。
+
+## 3. 请求体与 SOAP 动作
+
+### 3.1 信封
+
+`payload` 必须是一份完整的信封，从 `Envelope` 开始、到 `Envelope` 结束，包含命名空间声明和 `Body`。缺一层的常见后果是对端直接拒绝，错误信息与连接器本身无关。
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope
+  xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+  xmlns:ord="https://example.com/orders">
+  <soapenv:Header/>
+  <soapenv:Body>
+    <ord:GetOrder>
+      <ord:orderId>10086</ord:orderId>
+    </ord:GetOrder>
+  </soapenv:Body>
+</soapenv:Envelope>
+```
+
+信封里可以带流程变量：把整个信封写成脚本类型，或者用 `${…}` 在文本里拼入变量。需要按分支生成不同结构的信封时，用脚本生成更省事。
+
+### 3.2 动作与内容类型
+
+SOAP 1.1 与 SOAP 1.2 对「动作」的写法不同，连接器不会替你判断版本，两个头都要自己写对。
+
+| 版本 | 内容类型 | 动作 |
+| :--- | :--- | :--- |
+| SOAP 1.1 | `text/xml; charset=utf-8` | 单独的 `SOAPAction` 请求头，值是带引号的 URI |
+| SOAP 1.2 | `application/soap+xml; charset=utf-8` | 写在内容类型的 `action` 参数里，不再使用 `SOAPAction` 头 |
+
+因此 `headers` 里通常是这样两条：
+
+| 名称 | 取值示例 |
+| :--- | :--- |
+| `Content-Type` | `text/xml; charset=utf-8` |
+| `SOAPAction` | `"https://example.com/orders/GetOrder"` |
+
+写成 SOAP 1.2 时只留一条 `Content-Type`，把动作放进它的 `action` 参数；同时再带一个 `SOAPAction` 头反而可能被对端拒绝。
+
+## 4. 底层 HTTP 客户端
+
+SOAP 连接器继承 HTTP 连接器的网络实现，实际请求同样由 Apache HttpClient 发出。系统属性、包结构、自定义连接池与配置器的写法都与 HTTP 连接器相同，见 [HTTP 连接器](/reference/connector/http/#3-底层-http-客户端) 的对应章节。
+
+一项直接可用的继承能力是连接器配置项：与 HTTP 连接器一样可以设置请求超时、错误阻断等选项。
+
+## 5. 直接调用连接器
+
+在 Java 环境或自定义组件中，可以用流式接口直接发送请求。
+
+### 5.1 创建请求
+
+```java
+String envelope = "<soapenv:Envelope ...>...</soapenv:Envelope>";
+
+connector.createRequest()
+  .url("https://example.com/orders")
+  .soapAction("https://example.com/orders/GetOrder")
+  .contentType("text/xml; charset=utf-8")
+  .payload(envelope)
+  .execute();
+```
+
+`.soapAction(...)` 做的事就是追加一条 `SOAPAction` 请求头，与在参数表里自己写这一条等价。
+
+### 5.2 添加请求头
+
+```java
+HttpResponse response = connector.createRequest()
+  .url("https://example.com/orders")
+  .soapAction("https://example.com/orders/GetOrder")
+  .contentType("text/xml; charset=utf-8")
+  .header("Accept", "text/xml")
+  .payload(envelope)
+  .execute();
+```
+
+### 5.3 设置配置项
+
+```java
+HttpResponse response = connector.createRequest()
+  .url("https://example.com/orders")
+  .contentType("text/xml; charset=utf-8")
+  .payload(envelope)
+  .configOption("throw-http-error", "TRUE")
+  .execute();
+```
+
+配置项的语义与 HTTP 连接器一致。
+
+## 6. 错误处理
+
+错误分两类，处理方式不同。
+
+| 类型 | 触发时机 | 默认行为 |
+| :--- | :--- | :--- |
+| 请求本身不合法 | 发出之前：信封为空、方法不是 POST | 直接抛异常，请求不会发出去 |
+| 服务端返回错误 | 收到 4XX 或 5XX | **不抛异常**，状态码与响应体照常返回 |
+
+SOAP 的服务端错误通常是一段 `Fault` 报文，状态码为 500。默认情况下它不会中断流程，是否继续由后续网关判断——需要读取 `statusCode` 或解析 `response`。
+
+要让这类错误自动中断当前路径，把配置项 `throw-http-error` 置为 `TRUE`。同样的设置也可以在流程设计器里通过输入参数 `throw-http-error` 给定，开启后挂在该任务上的错误边界事件会随之触发。
+
+## 7. 响应处理
+
+响应对象提供状态码、响应头与响应体。
+
+```java
+Integer statusCode = response.getStatusCode();
+String contentType = response.getHeader("Content-Type");
+String body = response.getResponse();
+```
+
+响应体是一段 XML 字符串，逐字段取值前要先解析。在 Java 代码里用完响应后必须显式调用 `response.close()` 释放连接；在流程设计器中通过参数映射使用时，引擎负责释放。
+
+## 8. 泛型接口
+
+除流式方法外，连接器还提供一套按名字传参的泛型接口，与 HTTP 连接器同名同义。流程设计器里的输入与输出参数表，底层走的正是这套接口。
+
+### 8.1 设置请求参数
+
+```java
+SoapHttpRequest request = connector.createRequest();
+request.setRequestParameter("url", "https://example.com/orders");
+request.setRequestParameter("payload", envelope);
+request.setRequestParameter("headers", headers);
+```
+
+### 8.2 读取响应参数
+
+```java
+response.getResponseParameter("statusCode");
+response.getResponseParameter("headers");
+response.getResponseParameter("response");
+```
+
+## 9. 限制与前提
+
+| 限制 | 说明 |
+| :--- | :--- |
+| 独立依赖 | SOAP 连接器与 HTTP 连接器分开打包。运行环境没有它时按标识取不到实现，症状出现在第一次执行，而不是部署时 |
+| 方法只能是 POST | 读取接口描述之外的场景无法用 SOAP 连接器。写别的方法不会生效，直接调用时还会抛异常 |
+| 信封必填 | `payload` 为空或只有空白时请求不会发出。SOAP 的空操作也要写成带 `Body` 的空信封 |
+| 没有独立的动作参数 | 动作只是一条请求头，不会随连接器版本自动切换 SOAP 1.1 与 1.2 的写法 |
+| 不校验内容类型 | 连接器不会替你补 `Content-Type`。缺它或写错版本，对端常见的回应是 415 或 500 |
+| 错误默认不阻断 | 500 的 `Fault` 默认当作普通响应返回，除非开启 `throw-http-error` |
+| 字段级输出需要自己解析 | 连接器只返回响应体字符串，没有内置的 XML 取值能力 |
+| 没有服务基址的概念 | 只认完整地址。按环境切换主机名需在 `url` 里引用流程变量 |
+| 连接器资源不支持 SOAP | 设计模块的连接器资源只有 HTTP 与外部任务两种，SOAP 只能在任务的参数表里逐处配置 |

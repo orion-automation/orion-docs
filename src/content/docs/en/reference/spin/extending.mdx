@@ -1,0 +1,135 @@
+---
+title: Extending SPIN
+description: Register custom data formats and configure built-in ones through SPIN's service provider interfaces.
+sidebar:
+  order: 9
+---
+
+## 1. Two ways to extend
+
+SPIN exposes two independent extension points. Both use the Java service loader mechanism, so neither requires changing SPIN itself.
+
+| Goal | Extension point (SPI interface) |
+| :--- | :--- |
+| Adjust the behavior of an existing data format (date format, serialization details, security options) | `org.camunda.spin.spi.DataFormatConfigurator` |
+| Add a new data format (YAML, Protobuf, …) | `org.camunda.spin.spi.DataFormat` plus `org.camunda.spin.spi.DataFormatProvider` |
+
+Both register the same way: put the implementation's fully qualified class name in a file under `META-INF/services/` named after the interface. The steps are in [2.3 Register the configurator](#23-register-the-configurator) and [3.3 Register the provider](#33-register-the-provider).
+
+The distinction matters: **a configurator does not add a format, it changes the pieces inside one**; **a provider adds a new format** that can then be selected by name in a process.
+
+## 2. Configuring an existing data format
+
+### 2.1 What a configurator does
+
+A configurator declares which kind of data format it can configure. At startup SPIN hands it every matching data format instance, and it replaces components inside.
+
+What can actually be replaced depends on the data format:
+
+| Data format | Replaceable component | Details |
+| :--- | :--- | :--- |
+| JSON | `ObjectMapper` | [Configuring JSON handling](/en/reference/spin/json/configuring/) |
+| XML | `DocumentBuilderFactory`, `TransformerFactory`, `JAXBContext` | [Configuring XML handling](/en/reference/spin/xml/configuring/) |
+
+One configurator can serve several data format instances — SPIN passes it every match.
+
+### 2.2 Implement the configurator
+
+Implement `org.camunda.spin.spi.DataFormatConfigurator`, name the target data format class, and do the replacement in `configure`.
+
+```java
+package com.example.spin;
+
+import org.camunda.spin.impl.json.jackson.format.JacksonJsonDataFormat;
+import org.camunda.spin.spi.DataFormatConfigurator;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+public class JacksonConfigurator implements DataFormatConfigurator<JacksonJsonDataFormat> {
+
+  @Override
+  public Class<JacksonJsonDataFormat> getDataFormatClass() {
+    return JacksonJsonDataFormat.class;
+  }
+
+  @Override
+  public void configure(JacksonJsonDataFormat dataFormat) {
+    ObjectMapper objectMapper = new ObjectMapper();
+    // configure objectMapper as needed
+    dataFormat.setObjectMapper(objectMapper);
+  }
+}
+```
+
+`getDataFormatClass()` returns one class. SPIN supplies instances of that class **and its subclasses**.
+
+### 2.3 Register the configurator
+
+1. Implement `org.camunda.spin.spi.DataFormatConfigurator`
+2. Add the **fully qualified class name** to `META-INF/services/org.camunda.spin.spi.DataFormatConfigurator`
+3. Make sure the artifact containing the implementation is visible to SPIN's classloader
+
+The file contains one class name per line:
+
+```text
+com.example.spin.JacksonConfigurator
+```
+
+Several configurators means several lines. Put the file under `src/main/resources/META-INF/services/` so it is packaged with the jar.
+
+## 3. Providing a custom data format
+
+### 3.1 Implement the data format
+
+A custom data format implements the `org.camunda.spin.spi.DataFormat` interface: parse a string or character stream into a SPIN object, and write it back out.
+
+### 3.2 Implement the provider
+
+Also implement `org.camunda.spin.spi.DataFormatProvider`, which hands the data format to SPIN. SPIN looks up provider implementations at runtime through the service loader.
+
+### 3.3 Register the provider
+
+1. Implement `org.camunda.spin.spi.DataFormat`
+2. Implement `org.camunda.spin.spi.DataFormatProvider`
+3. Add the provider's fully qualified class name to `META-INF/services/org.camunda.spin.spi.DataFormatProvider`
+4. Make sure the artifact is visible to SPIN's classloader
+
+### 3.4 Verify the registration
+
+| Call | Purpose |
+| :--- | :--- |
+| `DataFormats.getAvailableDataFormats()` | Lists every available data format, custom ones alongside built-in ones |
+| `DataFormats.getDataFormat(name)` | Retrieves one data format by name |
+
+If your custom data format is missing from `getAvailableDataFormats()`, it is nearly always one of the first three steps: wrong file name, a simple class name instead of a fully qualified one, or an artifact outside the classloader.
+
+## 4. Loading and configuring
+
+Data formats are instantiated and configured at **load time**, after which SPIN caches them.
+
+Options can be passed as a `Map` at that point:
+
+```java
+Map<String, Object> configurationOptions = new HashMap<>();
+// entries depend on the concrete data format implementation
+DataFormats.loadDataFormats(classloader, configurationOptions);
+```
+
+Two consequences:
+
+* Configuration applies once at load time; **changes made at runtime are not re-applied**
+* Changing configuration means changing the data format instance, which means reloading
+
+## 5. Constraints
+
+| Item | Note |
+| :--- | :--- |
+| Classloader visibility | The implementation must be visible to SPIN's classloader or the service loader will not find it |
+| File location | Must be the agreed file name under `META-INF/services/`; a typo fails silently |
+| Class name format | Fully qualified only — a simple name does not work |
+| Configurator reach | Matched by class, so one configurator affects every instance of that class |
+| Failure mode | A missing configurator raises no error, the configuration simply does not apply — check the registration file first |
+
+## 6. Related pages
+
+- JSON options: see [Configuring JSON handling](/en/reference/spin/json/configuring/)
+- XML options: see [Configuring XML handling](/en/reference/spin/xml/configuring/)

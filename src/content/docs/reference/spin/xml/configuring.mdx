@@ -1,0 +1,65 @@
+---
+title: 配置 XML 处理
+description: SPIN 数据格式的安全解析选项与底层 XML 组件替换方式的接口参考。
+sidebar:
+  order: 6
+---
+
+## 1. 配置对象
+
+XML 数据格式基于 JAXB 与 DOM 实现。解析、序列化与映射分别由下面几个对象承担，都可以被替换。
+
+| 对象 | 负责 |
+| :--- | :--- |
+| `javax.xml.parsers.DocumentBuilderFactory` | 解析 XML 文档 |
+| `javax.xml.transform.TransformerFactory` | 序列化输出 |
+| `javax.xml.bind.JAXBContext` | 对象映射 |
+
+要注册配置器的数据格式类是 `org.camunda.spin.impl.xml.dom.format.DomXmlDataFormat`。它的实例提供对应的 setter，用来替换上述组件的默认实现。
+
+配置机制本身与其他数据格式共用，见 [扩展 SPIN](/reference/spin/extending/)。
+
+## 2. 安全解析
+
+XML 的两类经典风险是外部实体注入（XXE）与解析器层面的资源滥用。SPIN 提供了两个开关。
+
+| 配置项 | 说明 | 默认值 |
+| :--- | :--- | :--- |
+| `xxe-processing` | 是否处理外部 XML 实体。关闭可防止 XXE 攻击 | `false` |
+| `secure-processing` | 是否启用解析器的安全处理模式 | `true` |
+
+默认值是安全的一侧：外部实体默认不处理，安全处理默认开启。只有在确认报文来源可信、且确实依赖外部实体时，才考虑打开 `xxe-processing`。
+
+### 2.1 传入自定义配置
+
+配置项通过一个 `Map` 交给 `DataFormats.loadDataFormats(...)`。
+
+```java
+Map<String, Object> configurationOptions = new HashMap<>();
+configurationOptions.put("xxe-processing", true);
+configurationOptions.put("secure-processing", false);
+
+DataFormats.loadDataFormats(classloader, configurationOptions);
+```
+
+请注意：上面的写法**同时放宽了两个开关**，只在隔离环境或明确的兼容场景下使用。生产环境通常保持默认。
+
+## 3. 替换 JAXB 上下文
+
+自定义应用可以实现 `org.camunda.spin.spi.DataFormatConfigurator`，在其中换成自己的 `JAXBContext`。
+
+SPIN 会缓存并使用这个上下文。也就是说，配置只在加载阶段生效一次，运行期不会重新构建；需要变更配置时要重新加载数据格式。
+
+## 4. 影响范围
+
+| 项 | 说明 |
+| :--- | :--- |
+| 生效范围 | 整个数据格式实例，不是某一处调用 |
+| 生效时机 | 数据格式加载时 |
+| 与安全相关 | 关闭 `secure-processing` 会削弱防护，需评估 |
+| 与映射相关 | 替换 `JAXBContext` 会同时影响映射与序列化 |
+
+## 5. 相关文档
+
+- 扩展机制本身：见 [扩展 SPIN](/reference/spin/extending/)
+- JSON 的同类配置：见 [配置 JSON 处理](/reference/spin/json/configuring/)

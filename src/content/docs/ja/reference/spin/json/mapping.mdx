@@ -1,0 +1,82 @@
+---
+title: JSON のオブジェクトマッピング
+description: Jackson を介して JSON と Java オブジェクトを双方向に変換するためのインターフェースリファレンス。
+sidebar:
+  order: 4
+---
+
+## 1. 概要
+
+SPIN は Jackson のマッピングライブラリを取り込み、JSON データと Java オブジェクトの双方向変換を提供します。JSON のペイロードを型付きの Java オブジェクトへ直接マッピングでき、Java オブジェクトを標準の JSON へそのままシリアライズできます。
+
+## 2. オブジェクトモデルへのマッピング
+
+`Customer` クラスを例にします。
+
+```java
+public class Customer {
+  private String name;
+  public String getName() { return name; }
+  public void setName(String name) { this.name = name; }
+}
+
+```
+
+### 2.1 JSON から Java へ
+
+`mapTo()` は JSON オブジェクトを Java のインスタンスへマッピングします。
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+// JSON オブジェクトを Customer インスタンスへマッピング
+Customer customer = JSON("{\"name\": \"Kermit\"}").mapTo(Customer.class);
+
+```
+
+### 2.2 Java から JSON へ
+
+Java オブジェクトを JSON 文字列へ戻すのは簡単です。
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+// Java オブジェクトを JSON 文字列へ戻す
+String json = JSON(customer).toString();
+
+```
+
+## 3. プリミティブと文字列
+
+SPIN は真偽値や数値などの Java プリミティブを、対応する JSON の値へマッピングします。たとえば `JSON(true)` は JSON の定数 `true` になります。
+
+文字列だけは扱いが異なります。
+
+* **自動変換はしない**: 単なる文字列の値は、そのままでは JSON になりません。
+* **不正な JSON**: `JSON("a String")` は例外になります。`"a String"` は引用符がエスケープされておらず、正しい JSON ではないためです。
+* **コレクション**: 文字列のリストは正しく JSON 配列へ変換されます。
+
+## 4. ジェネリック型
+
+`List<Customer>` のようなコレクション型では、Java の型消去のため `mapTo(ArrayList.class)` だけでは要素の型が分かりません。
+
+代わりに正規型文字列を渡します。
+
+```java
+import static org.camunda.spin.Spin.JSON;
+
+String json = "[{\"name\": \"Kermit\"}, {\"name\": \"Hugo\"}]";
+
+// 完全修飾名でジェネリックなコレクション型を指定
+List<Customer> customers = JSON(json).mapTo("java.util.ArrayList<com.example.Customer>");
+
+```
+
+## 5. 多態型
+
+プロパティがインターフェースや抽象クラスとして宣言されている場合、Jackson は所有する型の静的な構造だけから実装クラスを推論できません。`Car` インターフェースを `StationWagon` や `Van` などが実装している場合がそれにあたります。
+
+### 5.1 方針
+
+* **ペイロードに型情報を持たせる**: Jackson は、JSON に明示的に含まれた型情報を使って多態の値を逆シリアライズします。
+* **設定**: そうした型のシリアライズと逆シリアライズの方針は、Jackson のドキュメントに従って設定します。設定は [JSON 処理の設定](/ja/reference/spin/json/configuring/) で述べる JSON データ形式の設定に置くことで、多態参照を含むペイロードを読むときにエンジンが正しいサブクラスを生成できます。

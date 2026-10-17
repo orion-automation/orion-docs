@@ -81,15 +81,18 @@ export default defineConfig({
                     collapsed: true,
                     items: [
                         {
-                            label: '设计中心',
+                            // 产品四大模块：Build / Run / Optimize / Admin。
+                            // 模块标识是 build（目录名也用它），中文界面上叫
+                            // 「设计」，日文叫「設計」，英文才写 Build。
+                            label: '设计',
                             translations: {
-                                root: '设计中心',
-                                en: 'Design Center',
-                                ja: '設計センター'
+                                root: '设计',
+                                en: 'Build',
+                                ja: '設計'
                             },
                             collapsed: true,
-                            // 在这里自动生成 bpmn 文件夹下的内容
-                            items: [{ autogenerate: { directory: 'howto/design', collapsed: true } }]
+                            // 在这里自动生成 build 文件夹下的内容
+                            items: [{ autogenerate: { directory: 'howto/build', collapsed: true } }]
                         },
                     ],
                 },
@@ -126,8 +129,18 @@ export default defineConfig({
                             },
                             collapsed: true,
                             items: [
-                                // 注意：如果 reference/bpmn 目录下有概览文档（如 index.mdx），可以放一记在最上方
-                                // { label: 'BPMN 概述', slug: 'reference/bpmn' },
+                                // 建模器界面参考（原 howto/design/bpmndesign.mdx）。
+                                // 固定写在最上方：它是画布各区域与按钮的总说明，
+                                // 读者应先知道画布长什么样，再查具体元素。
+                                {
+                                    label: '建模器界面',
+                                    translations: {
+                                        root: '建模器界面',
+                                        en: 'Modeler UI',
+                                        ja: 'モデラー画面'
+                                    },
+                                    slug: 'reference/bpmn/modeler'
+                                },
                                 {
                                     label: '事件',
                                     translations: {
@@ -190,7 +203,30 @@ export default defineConfig({
                                 ja: 'データ処理 (SPIN)'
                             },
                             collapsed: true,
-                            items: [{ autogenerate: { directory: 'reference/spin', collapsed: true } }]
+                            items: [
+                                // 两种数据格式各成一组：JSON 在前、XML 在后，最后是扩展机制
+                                {
+                                    label: 'JSON',
+                                    translations: { root: 'JSON', en: 'JSON', ja: 'JSON' },
+                                    collapsed: true,
+                                    items: [{ autogenerate: { directory: 'reference/spin/json', collapsed: true } }]
+                                },
+                                {
+                                    label: 'XML',
+                                    translations: { root: 'XML', en: 'XML', ja: 'XML' },
+                                    collapsed: true,
+                                    items: [{ autogenerate: { directory: 'reference/spin/xml', collapsed: true } }]
+                                },
+                                {
+                                    label: '扩展 SPIN',
+                                    translations: {
+                                        root: '扩展 SPIN',
+                                        en: 'Extending SPIN',
+                                        ja: 'SPIN の拡張'
+                                    },
+                                    slug: 'reference/spin/extending'
+                                }
+                            ]
                         }
                     ],
                 },

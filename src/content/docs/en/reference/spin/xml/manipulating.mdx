@@ -1,0 +1,156 @@
+---
+title: Manipulating XML elements and attributes
+description: Read, write, check and remove XML attributes and child elements, and change text content with the SPIN XML data format.
+sidebar:
+  order: 2
+---
+
+## 1. Attributes
+
+### 1.1 Checking attributes
+
+| Method | Description |
+| :--- | :--- |
+| `hasAttr(name)` | Whether an attribute with that name and no namespace exists |
+| `hasAttrNs(uri, name)` | Whether that name exists in the given namespace |
+
+```java
+import static org.camunda.spin.Spin.XML;
+
+String xml = "<order xmlns:cam=\"http://example.com\" id=\"order1\" cam:name=\"name\" />";
+
+XML(xml).hasAttr("id");                                   // true
+XML(xml).hasAttrNs("http://example.com", "name");         // true
+```
+
+### 1.2 Reading attributes
+
+`attr(name)` returns the attribute; call `value()` to get the value. Use `attrNs(uri, name)` for namespaced attributes.
+
+```java
+SpinXmlAttribute attribute = XML(xml).attr("id");
+String id = attribute.value();
+```
+
+Note that `hasAttrNs(uri, "name")` and `attr("name")` are not interchangeable: the first respects the namespace, the second only looks at names without one.
+
+### 1.3 Listing attributes
+
+| Method | Returns |
+| :--- | :--- |
+| `attrs()` | All attributes |
+| `attrs(uri)` | Attributes in the given namespace |
+| `attrNames()` | Names of all attributes |
+| `attrNames(uri)` | Names of attributes in the given namespace |
+
+### 1.4 Writing attributes
+
+You can set the value on the element or on the attribute object; both are equivalent.
+
+```java
+XML(xml).attr("id", "newId");
+
+SpinXmlAttribute attribute = XML(xml).attr("id");
+attribute.value("newId");
+```
+
+Use `attrNs(uri, name, value)` for namespaced attributes.
+
+### 1.5 Removing attributes
+
+```java
+SpinXmlDomElement element = XML(xml).removeAttr("id");
+```
+
+Calling `remove()` on the attribute object works too and returns the element it acted on. Use `removeAttrNs(uri, name)` for namespaced attributes.
+
+## 2. Text content
+
+`textContent()` reads an element's text; pass an argument to write it.
+
+```java
+SpinXmlDomElement element = XML("<customer>Foo</customer>");
+String text = element.textContent();   // "Foo"
+element.textContent("Bar");
+```
+
+`textContent()` concatenates all text below the element, including text inside children. To get only the direct text, locate it through a child element or a query.
+
+## 3. Child elements
+
+### 3.1 Reading child elements
+
+| Method | Returns |
+| :--- | :--- |
+| `childElement(name)` | First child with that name |
+| `childElement(uri, name)` | First child with that name in the given namespace |
+| `childElements(name)` | All children with that name |
+| `childElements(uri, name)` | All children with that name in the given namespace |
+
+```java
+String xml = "<order xmlns:cam=\"http://example.com\">"
+    + "<date/><cam:due/><item/><item/></order>";
+
+SpinXmlDomElement date = XML(xml).childElement("date");
+SpinXmlDomElement due = XML(xml).childElement("http://example.com", "due");
+SpinCollection<SpinXmlDomElement> items = XML(xml).childElements("item");
+```
+
+`childElement` looks at direct children only and never descends. To pick nodes by level or by condition, use [XPath queries](/en/reference/spin/xml/querying/).
+
+### 3.2 Appending child elements
+
+`append` takes one or more elements.
+
+```java
+SpinXmlTreeElement root = XML("<root/>");
+root.append(XML("<child/>"), XML("<child/>"));
+```
+
+Every argument must be able to live under that parent — an element already attached elsewhere has to be detached or copied first.
+
+### 3.3 Removing child elements
+
+`remove` takes one or more children.
+
+```java
+SpinXmlTreeElement root = XML("<root><child/><child/><child/></root>");
+root.remove(root.childElements("child"));
+```
+
+### 3.4 Replacing elements
+
+| Method | Effect |
+| :--- | :--- |
+| `replaceChild(old, new)` | Replace a child, called on the parent |
+| `replace(new)` | Replace the element itself, called on the element |
+
+```java
+SpinXmlTreeElement root = XML("<root><date/><order/></root>");
+root.replaceChild(root.childElement("date"), XML("<child/>"));
+root.childElement("order").replace(XML("<child/>"));
+```
+
+Both return the replacing element; the original is no longer part of the tree.
+
+## 4. Doing it from a script
+
+Scripting methods carry the same names and meanings. Reading an attribute value takes one extra `.value()`.
+
+```python
+xml = '<order id="1231"><item id="1"/></order>'
+
+assert S(xml).hasAttr('id')
+order_id = S(xml).attr('id').value()
+
+item_id = S(xml).childElement('item').attr('id').value()
+```
+
+## 5. Constraints
+
+| Item | Note |
+| :--- | :--- |
+| Methods are not interchangeable | Attribute methods only exist on elements, `value()` only on attributes |
+| Namespaces must be explicit | Methods without `Ns` never match a namespaced name |
+| Changes apply in place | Operations return the same tree, no re-parsing needed |
+| Changes stay in memory | Modifications are not written back to a process variable automatically |

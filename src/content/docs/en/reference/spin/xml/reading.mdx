@@ -1,0 +1,91 @@
+---
+title: Reading XML
+description: Read and parse XML from a string or a character stream with the SPIN XML data format.
+sidebar:
+  order: 1
+---
+
+## 1. Reading XML
+
+The SPIN XML data format reads and parses XML from a string or a character stream.
+
+### 1.1 From a string
+
+In Java there are two ways to turn an XML string into something you can work with.
+
+* **Name the format explicitly**: pass `xml()` to `S()` and tell SPIN the content is XML.
+
+```java
+import static org.camunda.spin.Spin.*;
+import static org.camunda.spin.DataFormats.*;
+
+SpinXmlElement xml = S("<order />", xml());
+```
+
+* **Use the shortcut**: call `XML()` directly.
+
+```java
+import static org.camunda.spin.Spin.*;
+
+SpinXmlElement xml = XML("<order />");
+```
+
+Both produce the same kind of object. Parsing validates the structure, so malformed input (an unclosed tag, for instance) throws immediately.
+
+### 1.2 From a character stream
+
+SPIN reads straight from a `java.io.Reader`, which suits files and network responses without buffering the whole document into a string first.
+
+```java
+import static org.camunda.spin.Spin.*;
+
+FileInputStream fis = new FileInputStream("/tmp/incomingOrder.xml");
+InputStreamReader reader = new InputStreamReader(fis, "utf-8");
+SpinXmlElement xml = XML(reader);
+```
+
+`S(reader, xml())` does the same thing.
+
+### 1.3 From a script
+
+Scripting languages are dynamically typed, so no format hint is needed — SPIN detects it.
+
+```javascript
+var orderId = S('<order id="1231" />').attr('id');
+```
+
+That single line parses the XML and reads the `id` attribute of the root element.
+
+## 2. Node types
+
+What you get back is not one generic object but several types, split by purpose. Pick the wrong one and the method you want simply is not there.
+
+| Type | Represents | Usually comes from |
+| :--- | :--- | :--- |
+| `SpinXmlElement` | Any XML element | Return value of `XML(...)` and `S(..., xml())` |
+| `SpinXmlTreeElement` | An element with its full tree, children can be added or removed | Parse result, `childElement(...)` |
+| `SpinXmlDomElement` | An element that supports DOM-level operations | Parse result, `childElement(...)` |
+| `SpinXmlAttribute` | One attribute | `attr(...)`, `attrNs(...)` |
+| `SpinXmlTreeAttribute` | An attribute obtained by query | `xPath(...).attribute()` |
+| `SpinList<T>` | A list of nodes or attributes | `childElements(...)`, `elementList()` |
+| `SpinCollection<T>` | A collection of attributes or elements | `attrs()`, `attributes()` |
+
+When you need attribute and child-element operations together, receive the result as `SpinXmlTreeElement` and you will have both.
+
+## 3. Namespaces
+
+Elements with the same local name can live in different namespaces. Every method with an `Ns` suffix takes a namespace URI; the version without a suffix only matches names that have no namespace.
+
+| Call | Matches |
+| :--- | :--- |
+| `attr("id")` | Only `id` with no namespace |
+| `attrNs(uri, "id")` | `id` in the given namespace |
+| `childElement("item")` | Only `item` with no namespace |
+| `childElement(uri, "item")` | `item` in the given namespace |
+
+Mixing these up does not raise an error — it just returns nothing. That is the single easiest way to lose time while debugging.
+
+## 4. Related pages
+
+- Adding and removing attributes and children: see [Manipulating XML elements and attributes](/en/reference/spin/xml/manipulating/)
+- XPath queries and namespace prefixes: see [Querying XML](/en/reference/spin/xml/querying/)
