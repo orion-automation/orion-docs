@@ -9,6 +9,7 @@
     "preview": "astro preview",
     "check": "tsc --noEmit",
     "check:astro": "astro check",
+    "docs:lint": "node .github/skills/orion-docs-authoring/scripts/lint-diataxis.mjs",
     "astro": "astro"
   },
   "dependencies": {
