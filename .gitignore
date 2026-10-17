@@ -24,3 +24,5 @@ pnpm-debug.log*
 .idea/
 
 CLAUDE.md
+# VS Code workspace file
+*.code-workspace
