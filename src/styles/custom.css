@@ -205,6 +205,30 @@
 	height: 2rem;
 }
 
+/* Header 右侧三块的间距： [试用 ORION]   │   [主题]    [语言]
+   --------------------------------------------------------------------------
+   那条竖线是 Starlight 的 `.social-icons::after` —— 它是 `social-icons` 这个
+   flex 容器**内部的**最后一个子项，只能吃到容器自己的 gap；而 `.right-group`
+   的 gap 被主题层压成了 0 ⇒ 线左边有 16px、右边 0px，看起来像贴在主题图标上
+   （这一条就是「分割线位置有问题」的真因）。
+   间距取三档：线两侧各 1.5rem（对称，线才是分隔符而不是贴纸）；主题↔语言
+   2rem —— 两个都是无边框的图标按钮，间距比线两侧还小就会糊成一组。 */
+.header .right-group {
+	gap: 0;
+}
+
+.header .social-icons {
+	gap: 1.5rem;
+}
+
+.header .social-icons::after {
+	margin-inline-end: 1.5rem;
+}
+
+.header orion-theme-select {
+	margin-inline-end: 2rem;
+}
+
 div[data-template="splash"] h1:where(.astro-q2ezz3gc),
 div[data-template="splash"] .hero h1,
 h1[id="_top"] {

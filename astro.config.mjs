@@ -47,11 +47,19 @@ export default defineConfig({
                 // 原生 <select> 的展开面板无法用 CSS 定制（深色下是一块白底），
                 // 换成自绘下拉；规范对齐前端应用 packages/ui 的 CustomSelect。
                 LanguageSelect: './src/components/LanguageSelect.astro',
+                // header 右侧：把原来的社交图标组替换成「Try ORION」主按钮
+                // （按语言分域名，见该组件头注释）
+                SocialIcons: './src/components/SocialIcons.astro',
+                // 内置实现是原生 <select>：图标固定 laptop 且只有 14px（与语言切换器
+                // 的 16px 地球不一致）、面板由系统自绘。换成自绘三档下拉，
+                // 文案对齐前端应用的 跟随系统 / 浅色 / 深色。
+                ThemeSelect: './src/components/ThemeSelect.astro',
             },
             customCss: ['./src/styles/custom.css'],
-            social: [
-                { icon: 'rocket', label: 'ORION', href: 'https://oriorion.com' },
-                { icon: 'github', label: 'GitHub', href: 'https://github.com/orion-automation' }],
+            // header 右侧不再放外链图标：原先的 ORION 火箭图标（指向 oriorion.com）
+            // 已下线，入口统一收敛为「Try ORION」按钮，由
+            // src/components/SocialIcons.astro 按当前语言渲染对应域名。
+            social: [],
             sidebar: [
                 {
                     label: '快速开始',

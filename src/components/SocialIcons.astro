@@ -1,0 +1,132 @@
+---
+/**
+ * Header 右侧的「社交/入口」区（覆盖 Starlight 内置的 SocialIcons）。
+ *
+ * 与默认实现的两点差别：
+ *   1. 原来的 ORION 火箭图标（指向 oriorion.com）已下线，`social` 现在为空；
+ *      组件仍保留 `links` 的渲染逻辑 —— 以后要加回任何社交图标，只改 astro.config
+ *      的 `social` 即可，不必再动这个文件。
+ *   2. 右侧改成一枚主按钮（CTA），文案按语言分别是「试用 ORION」/「Try ORION」/
+ *      「ORION を試す」。纯图标表达不了「去用产品」这个动作，用按钮才看得出是
+ *      入口而不是外链。
+ *   3. 按钮排在图标之后，`social-icons::after` 那条分隔线因此落在按钮右侧，
+ *      形如「按钮 | 主题 语言」，按钮自成一组。
+ *
+ * ## 按语言分域名与文案
+ *   · 中文（默认语言，key 为 `root`）→ hub.oriori.cn ／「试用 ORION」
+ *   · 英文（`en`）                    → hub.oriori.ai ／「Try ORION」
+ *   · 日语（`ja`）                    → hub.oriori.ai ／「ORION を試す」
+ * 两个域名在 2026-10-17 时都还没有解析/上线，地址由产品侧约定，发布后即可直接用。
+ *
+ * ⚠️ 判断语言用 `Astro.locals.starlightRoute.locale`，但**默认语言页取到的是
+ *    `undefined` 而不是 `'root'`** —— 不能拿它直接做索引，要先折算。
+ *    也不能用 `config.defaultLocale`：内部配置里它是解析后的 locale 对象
+ *    （`{ label, lang }`），不是 `'root'` 这个 key。
+ *
+ * ⚠️ Icon 只能从 `@astrojs/starlight/components` 具名导入。
+ *    `@astrojs/starlight/user-components/Icon.astro` 这个深路径**不在** exports
+ *    里，写了会让 dev server 每次请求都报 "is not exported"。
+ */
+
+import config from 'virtual:starlight/user-config';
+import { Icon } from '@astrojs/starlight/components';
+
+const links = config.social || [];
+
+/** 默认语言在 i18n 配置里的 key（本项目 `locales` 写的是 `root`）。 */
+const DEFAULT_LOCALE_KEY = 'root';
+
+/** 各语言对应的产品入口域名。 */
+const TRY_ORION_BY_LOCALE: Record<string, string> = {
+	[DEFAULT_LOCALE_KEY]: 'https://hub.oriori.cn',
+	en: 'https://hub.oriori.ai',
+	ja: 'https://hub.oriori.ai',
+};
+
+const currentLocale = Astro.locals.starlightRoute.locale ?? DEFAULT_LOCALE_KEY;
+const tryOrionUrl = TRY_ORION_BY_LOCALE[currentLocale] ?? TRY_ORION_BY_LOCALE[DEFAULT_LOCALE_KEY];
+
+/**
+ * 按钮文案。中文用「试用」而不是直译的「尝试」，它是产品入口的常见叫法；
+ * 日语用动词形「試す」而不是名词「トライアル」，跟日文站其它按钮（如
+ * 「読む」「始める」）的语气一致。
+ */
+const TRY_ORION_LABEL_BY_LOCALE: Record<string, string> = {
+	[DEFAULT_LOCALE_KEY]: '试用 ORION',
+	en: 'Try ORION',
+	ja: 'ORION を試す',
+};
+
+const tryOrionLabel =
+	TRY_ORION_LABEL_BY_LOCALE[currentLocale] ?? TRY_ORION_LABEL_BY_LOCALE[DEFAULT_LOCALE_KEY];
+---
+
+{
+	(links.length > 0 || tryOrionUrl) && (
+		<>
+			{links.map(({ label, href, icon }) => (
+				<a {href} rel="me" class="sl-flex" target="_blank">
+					<span class="sr-only">{label}</span>
+					<Icon name={icon} />
+				</a>
+			))}
+			<a class="orion-try-btn" href={tryOrionUrl} target="_blank" rel="noopener">
+				{tryOrionLabel}
+			</a>
+		</>
+	)
+}
+
+<style>
+	@layer starlight.core {
+		a:not(.orion-try-btn) {
+			color: var(--sl-color-text-accent);
+			padding: 0.5em;
+			margin: -0.5em;
+		}
+		a:not(.orion-try-btn):hover {
+			color: var(--sl-color-white);
+		}
+	}
+
+	/* 主按钮：跟随站点主题色，深浅两套都不用另写一份 */
+	.orion-try-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		height: 1.875rem;
+		padding-inline: 0.875rem;
+		border-radius: 999px;
+		background-color: var(--sl-color-accent);
+		color: #fff;
+		font-size: var(--sl-text-sm);
+		font-weight: 600;
+		line-height: 1;
+		white-space: nowrap;
+		text-decoration: none;
+		transition: background-color 0.15s ease, transform 0.15s ease;
+	}
+
+	.orion-try-btn:hover {
+		/* 与 `.sl-link-button.primary:hover` 同一套派生方式 */
+		background-color: color-mix(in srgb, var(--sl-color-accent) 82%, #000);
+		color: #fff;
+		text-decoration: none;
+	}
+
+	.orion-try-btn:active {
+		transform: translateY(1px);
+	}
+
+	.orion-try-btn:focus-visible {
+		outline: 2px solid var(--sl-color-text-accent);
+		outline-offset: 2px;
+	}
+
+	/* 窄屏时按钮会挤掉主题/语言切换，只在 md 以上显示（与右侧整组一致） */
+	@media (max-width: 49.99rem) {
+		.orion-try-btn {
+			display: none;
+		}
+	}
+</style>

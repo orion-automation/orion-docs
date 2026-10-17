@@ -1,0 +1,473 @@
+---
+/**
+ * 顶部 Header 的主题切换器（覆盖 Starlight 内置的 ThemeSelect）。
+ *
+ * ## 为什么要自己写
+ * 内置实现是一个原生 `<select>`（左侧固定 `laptop` 图标、右侧箭头，选项面板由浏览器
+ * 自绘）。三个毛病：
+ *   1. **图标尺寸和旁边的语言切换器不一致** —— 内置 `Select.astro` 把标签图标写死成
+ *      `--sl-label-icon-size: 0.875rem`（14px），而语言切换器的地球是 16px。
+ *   2. 图标固定是 `laptop`，不随当前主题变（选了深色，头上仍显示一台笔记本）。
+ *   3. 展开面板是不可定制的系统菜单，深色下是一块白底列表。
+ * 换成自绘下拉后，三者一并解决。
+ *
+ * ## 与前端应用对齐
+ * 参考 `packages/ui/src/components/AppLayout.vue` 的主题菜单：
+ *   · 三档：跟随系统 / 浅色 / 深色（对应 `theme.system|light|dark` 的文案）
+ *   · 触发按钮只放**当前档位的图标**（前端是 icon-only 的圆形按钮）
+ *   · 候选项 = 图标 + 文案，选中项高亮
+ * 面板的几何参数与语言切换器完全一致（同一个 `CustomSelect` 规范），两个下拉并排时
+ * 尺寸、圆角、投影、hover 底色都对得上。
+ *
+ * ## 图标尺寸
+ * 全部 16px（`<Icon size="16px" />`），与 `LanguageSelect.astro` 里手写的 16px 地球 /
+ * 箭头同尺寸 —— 这正是「两个图标看起来不一样大」的修复点。
+ *
+ * ## 与 Starlight 主题机制的接口
+ * 约定不变：偏好存在 `localStorage['starlight-theme']`，`''`（或 `'auto'`）表示跟随
+ * 系统；真正落到 `<html>` 上的是 `data-theme="light|dark"`。
+ * ⚠️ 本组件**不使用** `starlight-theme-select` 标签、也不给 svg 加 `label-icon` 类：
+ *    `ThemeProvider` 的 `updatePickers()` 会遍历 `starlight-theme-select` 并替换
+ *    `svg.label-icon` 的内容，用了反而会被它按内置图标覆盖掉。
+ */
+
+import { Icon } from '@astrojs/starlight/components';
+
+const accessibleLabel = Astro.locals.t('themeSelect.accessibleLabel');
+const currentLocale = Astro.locals.starlightRoute.locale ?? 'root';
+
+/**
+ * 文案对齐前端应用 `packages/ui/src/i18n/index.ts` 的 `theme.*`：
+ * 中文用「跟随系统」而不是 Starlight 官方的「自动」—— 后者歧义太大（自动什么？）。
+ */
+const LABELS: Record<string, Record<string, string>> = {
+	root: { auto: '跟随系统', light: '浅色', dark: '深色' },
+	en: { auto: 'System', light: 'Light', dark: 'Dark' },
+	ja: { auto: 'システム', light: 'ライト', dark: 'ダーク' },
+};
+const labels = LABELS[currentLocale] ?? LABELS.root!;
+
+/** 三档，顺序与前端主题菜单一致：跟随系统在最上。 */
+const options = [
+	{ value: 'auto', label: labels.auto!, icon: null },
+	{ value: 'light', label: labels.light!, icon: 'sun' },
+	{ value: 'dark', label: labels.dark!, icon: 'moon' },
+] as const;
+---
+
+<orion-theme-select data-mode="auto">
+	<details class="orion-theme">
+		<summary class="orion-theme__trigger" aria-label={accessibleLabel} title={labels.auto}>
+			{/* 三枚图标同时渲染，靠 `data-mode` 只显示当前那一枚 —— 这样切换主题
+			    不需要 JS 去改 DOM 结构，也避免了首屏按旧值闪一下。 */}
+			<span class="orion-theme__icon" data-theme-icon="auto">
+				{/* 「跟随系统」：半明半暗的圆（对比度 / contrast 图标），比笔记本
+				    图标更直白地表达「浅色深色都有可能」。 */}
+				<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+					<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"
+					></circle>
+					<path d="M12 3a9 9 0 0 1 0 18Z" fill="currentColor"></path>
+				</svg>
+			</span>
+			<span class="orion-theme__icon" data-theme-icon="light">
+				<Icon name="sun" size="16px" />
+			</span>
+			<span class="orion-theme__icon" data-theme-icon="dark">
+				<Icon name="moon" size="16px" />
+			</span>
+			<svg
+				class="orion-theme__caret"
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="currentColor"
+				aria-hidden="true"
+			>
+				<path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"></path>
+			</svg>
+		</summary>
+
+		<ul class="orion-theme__panel" role="list">
+			{
+				options.map((option) => (
+					<li>
+						<button
+							type="button"
+							class="orion-theme__option"
+							data-value={option.value}
+							aria-current={option.value === 'auto' ? 'true' : undefined}
+						>
+							<span class="orion-theme__check" aria-hidden="true">
+								<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+									<path d="M18.71 7.21a1 1 0 0 0-1.42 0l-7.45 7.46-3.13-3.14A1.02 1.02 0 1 0 5.29 13l3.84 3.84a1.001 1.001 0 0 0 1.42 0l8.16-8.16a1 1 0 0 0 0-1.477Z" />
+								</svg>
+							</span>
+							<span class="orion-theme__glyph" aria-hidden="true">
+								{option.icon ? (
+									<Icon name={option.icon} size="16px" />
+								) : (
+									<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+										<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+										<path d="M12 3a9 9 0 0 1 0 18Z" fill="currentColor" />
+									</svg>
+								)}
+							</span>
+							<span class="orion-theme__text">{option.label}</span>
+						</button>
+					</li>
+				))
+			}
+		</ul>
+	</details>
+</orion-theme-select>
+
+{/* 首屏同步：块级内联脚本，解析到这里立刻执行，避免「图标先渲染成跟随系统、
+    再跳成深色」的闪动。失败（隐私模式禁用 localStorage）就保持 SSR 的 auto。 */}
+<script is:inline>
+	try {
+		const stored = localStorage.getItem('starlight-theme');
+		const mode = stored === 'light' || stored === 'dark' ? stored : 'auto';
+		document.currentScript?.closest('orion-theme-select')?.setAttribute('data-mode', mode);
+	} catch {}
+</script>
+
+<style>
+	orion-theme-select {
+		display: inline-flex;
+		align-items: center;
+	}
+
+	/* 触发按钮只显示当前档位的图标 */
+	orion-theme-select[data-mode='auto'] [data-theme-icon]:not([data-theme-icon='auto']),
+	orion-theme-select[data-mode='light'] [data-theme-icon]:not([data-theme-icon='light']),
+	orion-theme-select[data-mode='dark'] [data-theme-icon]:not([data-theme-icon='dark']) {
+		display: none;
+	}
+
+	/* 勾只出现在当前档位上（面板默认收起，所以不依赖 JS 也能正确） */
+	orion-theme-select[data-mode='auto'] .orion-theme__option[data-value='auto'] .orion-theme__check,
+	orion-theme-select[data-mode='light'] .orion-theme__option[data-value='light'] .orion-theme__check,
+	orion-theme-select[data-mode='dark'] .orion-theme__option[data-value='dark'] .orion-theme__check {
+		opacity: 1;
+	}
+
+	/* ------------------------------------------------------------------
+	   触发按钮：与语言切换器完全同尺寸（图标 16 / 箭头 16 / 同一个 gap）
+	   ------------------------------------------------------------------ */
+	.orion-theme {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+	}
+
+	.orion-theme__trigger {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.25rem 0.125rem;
+		border: 0;
+		border-radius: 0.375rem;
+		background: none;
+		color: var(--sl-color-gray-2);
+		cursor: pointer;
+		list-style: none;
+		transition: color 0.15s ease;
+	}
+
+	.orion-theme__trigger::-webkit-details-marker {
+		display: none;
+	}
+
+	/* 与语言切换器同一条：暗色下 `--sl-color-text-accent` 会自动切到 accent-high */
+	.orion-theme__trigger:hover,
+	.orion-theme[open] .orion-theme__trigger {
+		color: var(--sl-color-text-accent);
+	}
+
+	.orion-theme__trigger:focus-visible {
+		outline: 2px solid var(--sl-color-text-accent);
+		outline-offset: 2px;
+	}
+
+	.orion-theme__icon,
+	.orion-theme__icon :global(svg) {
+		display: block;
+		width: 16px;
+		height: 16px;
+	}
+
+	.orion-theme__icon {
+		flex: none;
+		opacity: 0.85;
+	}
+
+	.orion-theme__caret {
+		flex: none;
+		opacity: 0.65;
+		transition: transform 0.15s ease;
+	}
+
+	.orion-theme[open] .orion-theme__caret {
+		transform: rotate(180deg);
+	}
+
+	/* ------------------------------------------------------------------
+	   面板：参数与 `.orion-lang__panel` 逐条一致（同一个 CustomSelect 规范）
+	   ------------------------------------------------------------------ */
+	.orion-theme__panel {
+		position: absolute;
+		inset-inline-end: 0;
+		top: calc(100% + 0.5rem);
+		z-index: 10;
+		min-width: max(11rem, 100%);
+		margin: 0;
+		padding: 0.375rem;
+		list-style: none;
+		border: 1px solid #e5e7eb;
+		border-radius: 0.5rem;
+		background-color: #ffffff;
+		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+		animation: orion-theme-in 0.1s ease-out;
+	}
+
+	:global([data-theme='dark']) .orion-theme__panel {
+		border-color: #334e61;
+		background-color: #1d3647;
+		box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+	}
+
+	@keyframes orion-theme-in {
+		from {
+			opacity: 0;
+			transform: translateY(-0.25rem);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	.orion-theme__option {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		width: 100%;
+		min-height: 2rem;
+		padding: 0.375rem 0.625rem;
+		border: 0;
+		border-radius: 0.375rem;
+		background: none;
+		color: #374151;
+		font-family: inherit;
+		font-size: 0.8125rem;
+		line-height: 1.35;
+		text-align: start;
+		cursor: pointer;
+		transition: background-color 0.12s ease, color 0.12s ease;
+	}
+
+	:global([data-theme='dark']) .orion-theme__option {
+		color: #c9d0de;
+	}
+
+	.orion-theme__option:hover {
+		background-color: #f3f4f6;
+	}
+
+	:global([data-theme='dark']) .orion-theme__option:hover {
+		background-color: rgba(255, 255, 255, 0.06);
+	}
+
+	.orion-theme__option:focus-visible {
+		outline: 2px solid var(--sl-color-text-accent);
+		outline-offset: -2px;
+	}
+
+	/* 选中态：品牌色浅底 + 品牌色文字（前端 CustomSelect 的选中规范） */
+	.orion-theme__option[aria-current='true'] {
+		background-color: color-mix(in srgb, var(--sl-color-text-accent) 12%, transparent);
+		color: var(--sl-color-text-accent);
+		font-weight: 600;
+	}
+
+	.orion-theme__check {
+		display: inline-flex;
+		flex: none;
+		align-items: center;
+		justify-content: center;
+		width: 15px;
+		height: 15px;
+		opacity: 0;
+	}
+
+	.orion-theme__glyph {
+		display: inline-flex;
+		flex: none;
+		align-items: center;
+		justify-content: center;
+		width: 16px;
+		height: 16px;
+	}
+
+	.orion-theme__glyph :global(svg) {
+		display: block;
+		width: 16px;
+		height: 16px;
+	}
+
+	.orion-theme__text {
+		white-space: nowrap;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.orion-theme__panel {
+			animation: none;
+		}
+		.orion-theme__caret {
+			transition: none;
+		}
+	}
+</style>
+
+<script>
+	/**
+	 * 主题偏好的读写与 Starlight 内置实现保持一致：
+	 *   `localStorage['starlight-theme']` = `'light' | 'dark' | ''`（空 = 跟随系统）
+	 *   `<html data-theme>`               = `'light' | 'dark'`（永远是解析后的结果）
+	 *
+	 * ⚠️ 空了要写 `''` 而不是 `'auto'`：`ThemeProvider` 的首屏内联脚本直接把这个值
+	 *    当主题名用（`theme === 'light' ? 'light' : 'dark'`），写 `'auto'` 会让它
+	 *    在首屏判成深色。
+	 */
+	type ThemeMode = 'auto' | 'light' | 'dark';
+
+	const STORAGE_KEY = 'starlight-theme';
+
+	const parseMode = (raw: string | null): ThemeMode =>
+		raw === 'light' || raw === 'dark' ? raw : 'auto';
+
+	const prefersLight = () => window.matchMedia('(prefers-color-scheme: light)').matches;
+
+	const resolve = (mode: ThemeMode): 'light' | 'dark' =>
+		mode === 'auto' ? (prefersLight() ? 'light' : 'dark') : mode;
+
+	class OrionThemeSelect extends HTMLElement {
+		details: HTMLDetailsElement | null = null;
+		trigger: HTMLElement | null = null;
+		options: HTMLButtonElement[] = [];
+
+		connectedCallback() {
+			this.details = this.querySelector('details');
+			this.trigger = this.querySelector('summary');
+			this.options = Array.from(this.querySelectorAll('.orion-theme__option'));
+			if (!this.details || !this.trigger) return;
+
+			this.sync(parseMode(this.readStored()));
+
+			document.addEventListener('click', this.onDocumentClick);
+			this.addEventListener('keydown', this.onKeydown);
+			this.media = window.matchMedia('(prefers-color-scheme: light)');
+			this.media.addEventListener('change', this.onSystemChange);
+		}
+
+		disconnectedCallback() {
+			document.removeEventListener('click', this.onDocumentClick);
+			this.removeEventListener('keydown', this.onKeydown);
+			this.media?.removeEventListener('change', this.onSystemChange);
+		}
+
+		media: MediaQueryList | null = null;
+
+		readStored(): string | null {
+			try {
+				return localStorage.getItem(STORAGE_KEY);
+			} catch {
+				/* 隐私模式下可能直接抛错 */
+				return null;
+			}
+		}
+
+		/** 把当前档位同步到界面：`<html data-theme>`、图标、勾、aria-current、title。 */
+		sync(mode: ThemeMode) {
+			document.documentElement.dataset.theme = resolve(mode);
+			this.setAttribute('data-mode', mode);
+
+			for (const option of this.options) {
+				const isCurrent = option.dataset.value === mode;
+				option.setAttribute('aria-current', isCurrent ? 'true' : 'false');
+			}
+
+			const label = this.options.find((o) => o.dataset.value === mode)?.textContent?.trim();
+			if (label) this.trigger?.setAttribute('title', label);
+		}
+
+		select(mode: ThemeMode) {
+			this.sync(mode);
+			try {
+				localStorage.setItem(STORAGE_KEY, mode === 'auto' ? '' : mode);
+			} catch {
+				/* ignore */
+			}
+		}
+
+		onSystemChange = () => {
+			// 只有「跟随系统」需要在系统偏好变化时重新解析
+			if (this.getAttribute('data-mode') === 'auto') this.sync('auto');
+		};
+
+		onDocumentClick = (event: MouseEvent) => {
+			if (!this.details?.open) return;
+			if (event.target instanceof Node && this.contains(event.target)) return;
+			this.details.open = false;
+		};
+
+		onKeydown = (event: KeyboardEvent) => {
+			if (!this.details) return;
+
+			if (event.key === 'Escape' && this.details.open) {
+				event.preventDefault();
+				this.details.open = false;
+				this.trigger?.focus();
+				return;
+			}
+
+			if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+
+			event.preventDefault();
+			const forward = event.key === 'ArrowDown';
+
+			if (!this.details.open) {
+				this.details.open = true;
+				(forward ? this.options[0] : this.options[this.options.length - 1])?.focus();
+				return;
+			}
+
+			const index = this.options.indexOf(document.activeElement as HTMLButtonElement);
+			const next =
+				index === -1
+					? forward
+						? 0
+						: this.options.length - 1
+					: (index + (forward ? 1 : -1) + this.options.length) % this.options.length;
+			this.options[next]?.focus();
+		};
+	}
+
+	if (!customElements.get('orion-theme-select')) {
+		customElements.define('orion-theme-select', OrionThemeSelect);
+	}
+
+	// 选项点击：事件委托，避免给每个 button 单独挂监听
+	document.addEventListener('click', (event) => {
+		const button = (event.target as Element | null)?.closest?.('.orion-theme__option');
+		if (!(button instanceof HTMLButtonElement)) return;
+		const host = button.closest('orion-theme-select');
+		if (!(host instanceof HTMLElement)) return;
+		const mode = button.dataset.value as ThemeMode | undefined;
+		if (!mode) return;
+		(host as unknown as { select: (m: ThemeMode) => void }).select(mode);
+		const details = host.querySelector('details');
+		if (details) details.open = false;
+		host.querySelector('summary')?.focus();
+	});
+</script>
