@@ -18,7 +18,11 @@ export default defineConfig({
         starlight({
             plugins: [starlightThemeRapide()],
             logo: {
-                src: './src/assets/orionlogo.svg',
+                // 与前端应用（packages/ui/src/components/AppLayout.vue）保持一致：
+                // 浅色用品牌蓝 orilogo.svg，深色用 orilogogrey.svg
+                light: './src/assets/orilogo.svg',
+                dark: './src/assets/orilogogrey.svg',
+                // 图标已是完整品牌标识（含 ORI 字样），不再重复显示站点标题
                 replacesTitle: true,
             },
             title: 'ORION Automation',
@@ -40,6 +44,9 @@ export default defineConfig({
             },
             components: {
                 Footer: './src/components/customFooter.astro',
+                // 原生 <select> 的展开面板无法用 CSS 定制（深色下是一块白底），
+                // 换成自绘下拉；规范对齐前端应用 packages/ui 的 CustomSelect。
+                LanguageSelect: './src/components/LanguageSelect.astro',
             },
             customCss: ['./src/styles/custom.css'],
             social: [

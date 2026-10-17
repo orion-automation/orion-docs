@@ -1,0 +1,389 @@
+---
+/**
+ * 顶部 Header 的语言切换器（覆盖 Starlight 内置的 LanguageSelect）。
+ *
+ * ## 为什么要自己写
+ * Starlight 用的是原生 `<select>`：**触发按钮**还能用 CSS 收拾，但点开之后那层
+ * 选项面板由浏览器自绘，CSS 完全够不到 —— 深色主题下它依旧按浅色调色板画出一块
+ * 白底列表，跟整站风格脱节。所以这里换成自绘下拉。
+ *
+ * ## 交互/视觉规范从哪来
+ * 对齐前端应用 `packages/ui/src/components/shared/CustomSelect.vue`（全仓唯一的
+ * 下拉范式）：面板 `rounded-lg` + `p-1.5` + 大投影、候选项 `rounded-md` + `min-h-8`、
+ * 选中态「品牌色浅底 + 品牌色文字」、hover 是极淡的中性底。
+ * 触发按钮按设计稿：**不做胶囊、不加描边**，只有「地球图标 + 当前语言 + 小箭头」，
+ * hover 时整体变成强调色。
+ *
+ * ## 为什么用 <details>
+ * 面板要能展开就必须有 JS；`<details>` 让「点开」这件事在**没有 JS** 时也能工作，
+ * JS 只负责补「点外面关闭 / Esc 关闭 / 方向键移动焦点」这些增强。
+ *
+ * ## 候选项是真链接
+ * 不是 `button + JS 跳转`：这样中键新标签、复制链接、无 JS 场景全部天然可用，
+ * 也让搜索引擎能爬到三语互链。
+ */
+
+import config from 'virtual:starlight/user-config';
+import context from 'virtual:starlight/project-context';
+
+/**
+ * 与 `@astrojs/starlight/utils/localizedUrl` 同一套算法（那个工具不在包的 exports
+ * 里，无法直接 import）。把当前 URL 换算成目标语言的等价 URL。
+ */
+function localizedPathname(locale: string | undefined): string {
+	const url = new URL(Astro.url);
+	if (!config.locales) return url.pathname;
+	if (locale === 'root') locale = '';
+
+	/** Base 去掉尾斜杠，便于比较（本项目 base 为 `/`）。 */
+	const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+	const hasBase = url.pathname.startsWith(base);
+	if (hasBase) url.pathname = url.pathname.replace(base, '');
+
+	const [_leadingSlash, baseSegment] = url.pathname.split('/');
+	const htmlExt = '.html';
+	const isRootHtml = baseSegment?.endsWith(htmlExt);
+	const baseSlug = isRootHtml ? baseSegment?.slice(0, -htmlExt.length) : baseSegment;
+
+	if (baseSlug && baseSlug in config.locales) {
+		// 当前就在某个非默认语言下：替换那一段，或（回默认语言时）把它删掉
+		if (locale) {
+			url.pathname = url.pathname.replace(baseSlug, locale);
+		} else if (isRootHtml) {
+			url.pathname = '/index.html';
+		} else {
+			url.pathname = url.pathname.replace('/' + baseSlug, '');
+		}
+	} else if (locale) {
+		// 当前在默认语言下：把目标语言的段插到前面
+		url.pathname =
+			baseSegment === 'index.html' ? '/' + locale + '.html' : '/' + locale + url.pathname;
+	}
+
+	if (hasBase) url.pathname = base + url.pathname;
+	if (context.trailingSlash === 'never') url.pathname = url.pathname.replace(/\/$/, '');
+	return url.pathname;
+}
+
+/**
+ * ⚠️ 默认语言的页面 `starlightRoute.locale` 是 `undefined`（不是 `'root'`），
+ * 所以拿 `code === locale` 直接比会让**默认语言永远不显示选中态**。
+ * 这里统一折算成 locales 里的 key。
+ *
+ * ⚠️ 也不能用 `config.defaultLocale` 兜底：它在内部配置里是**解析后的 locale 对象**
+ * （`{ label, lang }`），不是 `'root'` 这个 key。
+ */
+const DEFAULT_LOCALE_KEY = 'root';
+const currentLocale = Astro.locals.starlightRoute.locale ?? DEFAULT_LOCALE_KEY;
+const accessibleLabel = Astro.locals.t('languageSelect.accessibleLabel');
+
+const options = Object.entries(config.locales ?? {}).map(([code, locale]) => ({
+	value: localizedPathname(code),
+	label: locale!.label,
+	lang: locale!.lang,
+	selected: code === currentLocale,
+}));
+
+const currentLabel = options.find((o) => o.selected)?.label ?? options[0]?.label ?? '';
+---
+
+{
+	config.isMultilingual && (
+		<orion-lang-select>
+			<details class="orion-lang">
+				<summary class="orion-lang__trigger" aria-label={accessibleLabel}>
+					{/* 地球图标（Material Symbols "public" 的路径）*/}
+					<svg
+						class="orion-lang__globe"
+						width="16"
+						height="16"
+						viewBox="0 0 24 24"
+						fill="currentColor"
+						aria-hidden="true"
+					>
+						<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm6.92 6h-2.95a15.65 15.65 0 0 0-1.38-3.56A8.03 8.03 0 0 1 18.92 8ZM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96ZM4.26 14a7.82 7.82 0 0 1 0-4h3.38a16.34 16.34 0 0 0 0 4H4.26Zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56A7.99 7.99 0 0 1 5.08 16Zm2.95-8H5.08a7.99 7.99 0 0 1 4.33-3.56A15.65 15.65 0 0 0 8.03 8ZM12 19.96a13.79 13.79 0 0 1-1.91-3.96h3.82a13.79 13.79 0 0 1-1.91 3.96ZM14.34 14H9.66a14.72 14.72 0 0 1 0-4h4.68a14.72 14.72 0 0 1 0 4Zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95a8.03 8.03 0 0 1-4.33 3.56ZM16.36 14a16.34 16.34 0 0 0 0-4h3.38a7.82 7.82 0 0 1 0 4h-3.38Z" />
+					</svg>
+					<span class="orion-lang__label">{currentLabel}</span>
+					<svg
+						class="orion-lang__caret"
+						width="16"
+						height="16"
+						viewBox="0 0 24 24"
+						fill="currentColor"
+						aria-hidden="true"
+					>
+						<path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z" />
+					</svg>
+				</summary>
+
+				<ul class="orion-lang__panel" role="list">
+					{options.map((option) => (
+						<li>
+							<a
+								href={option.value}
+								class="orion-lang__option"
+								hreflang={option.lang}
+								aria-current={option.selected ? 'true' : undefined}
+							>
+								{/* 勾只出现在选中项上；未选中项留同宽占位，保证文字左沿对齐 */}
+								<span class="orion-lang__check" aria-hidden="true">
+									{option.selected && (
+										<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+											<path d="M18.71 7.21a1 1 0 0 0-1.42 0l-7.45 7.46-3.13-3.14A1.02 1.02 0 1 0 5.29 13l3.84 3.84a1.001 1.001 0 0 0 1.42 0l8.16-8.16a1 1 0 0 0 0-1.477Z" />
+										</svg>
+									)}
+								</span>
+								<span class="orion-lang__text">{option.label}</span>
+							</a>
+						</li>
+					))}
+				</ul>
+			</details>
+		</orion-lang-select>
+	)
+}
+
+<style>
+	orion-lang-select {
+		display: inline-flex;
+		align-items: center;
+	}
+
+	/* ------------------------------------------------------------------
+	   触发按钮：无边框、无底色，只有 图标 + 文字 + 箭头
+	   ------------------------------------------------------------------ */
+	.orion-lang {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+	}
+
+	.orion-lang__trigger {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.25rem 0.125rem;
+		border: 0;
+		border-radius: 0.375rem;
+		background: none;
+		color: var(--sl-color-gray-2);
+		font-size: var(--sl-text-sm);
+		font-weight: 500;
+		line-height: 1.2;
+		cursor: pointer;
+		list-style: none;
+		transition: color 0.15s ease;
+	}
+
+	/* 去掉 <summary> 自带的三角标记 */
+	.orion-lang__trigger::-webkit-details-marker {
+		display: none;
+	}
+
+	/* ⚠️ 用 `--sl-color-text-accent` 而不是 `--sl-color-accent`：前者在暗色主题下
+	   自动切到 accent-high（浅蓝），后者在暗底上对比度不足（蓝 #0000ff 压深底）。 */
+	.orion-lang__trigger:hover,
+	.orion-lang[open] .orion-lang__trigger {
+		color: var(--sl-color-text-accent);
+	}
+
+	.orion-lang__trigger:focus-visible {
+		outline: 2px solid var(--sl-color-text-accent);
+		outline-offset: 2px;
+	}
+
+	.orion-lang__globe {
+		flex: none;
+		opacity: 0.85;
+	}
+
+	.orion-lang__label {
+		white-space: nowrap;
+	}
+
+	.orion-lang__caret {
+		flex: none;
+		opacity: 0.65;
+		transition: transform 0.15s ease;
+	}
+
+	.orion-lang[open] .orion-lang__caret {
+		transform: rotate(180deg);
+	}
+
+	/* ------------------------------------------------------------------
+	   面板：与前端应用 CustomSelect 同一套参数
+	   （rounded-lg + p-1.5 + 大投影；见 packages/ui/.../CustomSelect.vue）
+	   ------------------------------------------------------------------ */
+	.orion-lang__panel {
+		position: absolute;
+		inset-inline-end: 0;
+		top: calc(100% + 0.5rem);
+		z-index: 10;
+		min-width: max(10rem, 100%);
+		margin: 0;
+		padding: 0.375rem;
+		list-style: none;
+		border: 1px solid #e5e7eb;
+		border-radius: 0.5rem;
+		background-color: #ffffff;
+		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+		animation: orion-lang-in 0.1s ease-out;
+	}
+
+	:global([data-theme='dark']) .orion-lang__panel {
+		/* 与前端「深色·蓝」同一档表面：比导航底 #193040 再高一级，
+		   描边用该主题的 #334e61（见 styles/custom.css 第 3 节）*/
+		border-color: #334e61;
+		background-color: #1d3647;
+		box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+	}
+
+	@keyframes orion-lang-in {
+		from {
+			opacity: 0;
+			transform: translateY(-0.25rem);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	.orion-lang__option {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		min-height: 2rem;
+		padding: 0.375rem 0.625rem;
+		border-radius: 0.375rem;
+		color: #374151;
+		font-size: 0.8125rem;
+		line-height: 1.35;
+		text-decoration: none;
+		transition: background-color 0.12s ease, color 0.12s ease;
+	}
+
+	:global([data-theme='dark']) .orion-lang__option {
+		color: #c9d0de;
+	}
+
+	.orion-lang__option:hover {
+		background-color: #f3f4f6;
+		text-decoration: none;
+	}
+
+	:global([data-theme='dark']) .orion-lang__option:hover {
+		background-color: rgba(255, 255, 255, 0.06);
+	}
+
+	.orion-lang__option:focus-visible {
+		outline: 2px solid var(--sl-color-text-accent);
+		outline-offset: -2px;
+	}
+
+	/* 选中态：品牌色浅底 + 品牌色文字（前端 CustomSelect 的选中规范） */
+	.orion-lang__option[aria-current='true'] {
+		background-color: color-mix(in srgb, var(--sl-color-text-accent) 12%, transparent);
+		color: var(--sl-color-text-accent);
+		font-weight: 600;
+	}
+
+	.orion-lang__check {
+		display: inline-flex;
+		flex: none;
+		align-items: center;
+		justify-content: center;
+		width: 15px;
+		height: 15px;
+	}
+
+	.orion-lang__text {
+		white-space: nowrap;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.orion-lang__panel {
+			animation: none;
+		}
+		.orion-lang__caret {
+			transition: none;
+		}
+	}
+</style>
+
+<script>
+	/**
+	 * `<details>` 已自带「点开 / 再点收起」，这里只补三件事：
+	 *   1. 点面板外面关闭（否则菜单会一直挂在页面上）
+	 *   2. Esc 关闭并把焦点还给触发按钮（键盘用户的常规预期）
+	 *   3. 方向键在候选项之间移动焦点
+	 */
+	class OrionLangSelect extends HTMLElement {
+		details: HTMLDetailsElement | null = null;
+		trigger: HTMLElement | null = null;
+		links: HTMLAnchorElement[] = [];
+
+		connectedCallback() {
+			this.details = this.querySelector('details');
+			this.trigger = this.querySelector('summary');
+			this.links = Array.from(this.querySelectorAll('.orion-lang__option'));
+			if (!this.details || !this.trigger) return;
+
+			document.addEventListener('click', this.onDocumentClick);
+			this.addEventListener('keydown', this.onKeydown);
+		}
+
+		disconnectedCallback() {
+			document.removeEventListener('click', this.onDocumentClick);
+			this.removeEventListener('keydown', this.onKeydown);
+		}
+
+		onDocumentClick = (event: MouseEvent) => {
+			if (!this.details?.open) return;
+			if (event.target instanceof Node && this.contains(event.target)) return;
+			this.close();
+		};
+
+		onKeydown = (event: KeyboardEvent) => {
+			if (!this.details) return;
+			const isOpen = this.details.open;
+
+			if (event.key === 'Escape' && isOpen) {
+				event.preventDefault();
+				this.close();
+				this.trigger?.focus();
+				return;
+			}
+
+			if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+
+			event.preventDefault();
+			const forward = event.key === 'ArrowDown';
+
+			// 收起状态下按方向键 = 直接展开并落到第一项/最后一项
+			if (!isOpen) {
+				this.details.open = true;
+				(forward ? this.links[0] : this.links[this.links.length - 1])?.focus();
+				return;
+			}
+
+			const index = this.links.indexOf(document.activeElement as HTMLAnchorElement);
+			const next =
+				index === -1
+					? forward
+						? 0
+						: this.links.length - 1
+					: (index + (forward ? 1 : -1) + this.links.length) % this.links.length;
+			this.links[next]?.focus();
+		};
+
+		close() {
+			if (this.details) this.details.open = false;
+		}
+	}
+
+	if (!customElements.get('orion-lang-select')) {
+		customElements.define('orion-lang-select', OrionLangSelect);
+	}
+</script>

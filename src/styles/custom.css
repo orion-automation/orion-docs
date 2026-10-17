@@ -94,19 +94,48 @@
 /* ==========================================================================
    3. 双模颜色系统 (Dark Mode / Light Mode)
    ========================================================================== */
-/* Dark mode colors */
-:root {
-	--sl-color-accent-low: #0f214a;
-	--sl-color-accent: #0000ff;
-	--sl-color-accent-high: #afc9fd;
-	--sl-color-white: #ffffff;
-	--sl-color-gray-1: #def1ff;
-	--sl-color-gray-2: #adc6d8;
-	--sl-color-gray-3: #6092b5;
-	--sl-color-gray-4: #2c5d7e;
-	--sl-color-gray-5: #043c5b;
-	--sl-color-gray-6: #002a42;
-	--sl-color-black: #061a28;
+/* Dark mode colors
+   --------------------------------------------------------------------------
+   对齐前端应用的「深色·蓝」主题（apps/<app>/src/assets/dark-blue.css，由
+   scripts/gen-dark-blue-css.mjs 生成的那一套）。灰阶不是随手调的，是从它
+   那套覆盖层里逐个取的，保持「页面底 < 导航/侧栏 < 卡片 < 描边」的同一条
+   明度阶梯：
+     #14232d 页面底（--bg-color）
+     #193040 侧栏 / 导航 / 输入底（--user-bubble-bg、--input-bg）
+     #1d3647 卡片、下拉面板这类再高一档的表面
+     #334e61 描边（原 #424652 的蓝调版）
+     #3c576a 强描边 / 滚动条（原 #4a4e5c 的蓝调版）
+     #9ca1b0 次要文字（--text-secondary，两支一致）
+     #e8eaf0 正文（--text-primary，两支一致）
+   强调色用前端暗色档 #6694ff（原橙色 #ff7754 在该主题里被映射成的蓝）。
+   ⚠️ 它只适合当**前景**（链接/选中文字，在 #14232d 上 5.6:1）；当按钮底色时
+   白字只有 2.6:1，所以 `--sl-color-accent`（按钮底）另取深一档 #2f5fd0。
+   ========================================================================== */
+/* ⚠️ 选择器必须带上 `[data-theme]`，不能只写 `:root`：
+   starlight-theme-rapide 会在 customCss **之后**再注入一份 `:root`（强调色是
+   hue 164 的绿），同特异度下后者胜出 —— 也就是说**加下面这段之前，这里的暗色
+   token 一直是死代码**，暗色实际用的是 rapide 的绿版中性色。带上 `[data-theme]`
+   后特异度取到 (0,2,0)，与浅色那一块对齐，既压过 rapide 又不依赖加载顺序。
+   ⚠️ 本文件注释里**不能出现星号紧接斜杠**（会提前闭合注释，把后面的规则整条
+   吐掉 —— 之前写成 apps/星号/src 就踩过这个坑）。 */
+:root[data-theme='dark'] {
+	--sl-color-accent-low: #1c3450;
+	--sl-color-accent: #2f5fd0;
+	--sl-color-accent-high: #6694ff;
+	--sl-color-white: #f2f5fa;
+	--sl-color-gray-1: #e8eaf0;
+	--sl-color-gray-2: #c9d0de;
+	--sl-color-gray-3: #9ca1b0;
+	--sl-color-gray-4: #4a6274;
+	--sl-color-gray-5: #334e61;
+	--sl-color-gray-6: #193040;
+	--sl-color-black: #14232d;
+
+	/* rapide 自己的几个 token（代码块 / 顶栏 / 描边）也按同一套蓝调重算，
+	   否则暗色下代码块还是原来那套近黑灰，跟新的蓝调底子接不上。 */
+	--sl-rapide-ui-bg-color: #101b22;
+	--sl-rapide-ui-header-bg-color: #193040cc;
+	--sl-rapide-ui-border-color: #334e61;
 }
 
 /* Light mode colors */
@@ -128,17 +157,7 @@
 /* ==========================================================================
    4. UI 组件修复与定制 (语言选择器、主按钮、正文间距)
    ========================================================================== */
-/* 修复语言选择器文本截断 */
-starlight-lang-select {
-	max-width: none !important;
-}
-
-starlight-lang-select select {
-	width: auto !important;
-	max-width: 7rem !important;
-	min-width: 4.5rem !important;
-	text-overflow: clip !important;
-}
+/* 语言选择器已改为自绘下拉，样式见文件末尾“30. 语言下拉菜单”一节 */
 
 .sl-link-button {
 	/* 保持上下 0.75rem 不变，将左右从 1rem 增加到 1.5rem */
@@ -157,8 +176,9 @@ starlight-lang-select select {
 }
 
 .sl-link-button.primary:hover {
-	background-color: #0000cc !important;
-	border-color: #0000cc !important;
+	/* 跟随 `--sl-color-accent` 派生，深浅两个主题都不用再各写一份 */
+	background-color: color-mix(in srgb, var(--sl-color-accent) 82%, #000000) !important;
+	border-color: color-mix(in srgb, var(--sl-color-accent) 82%, #000000) !important;
 	text-decoration: none !important;
 }
 
@@ -179,6 +199,12 @@ starlight-lang-select select {
 /* ==========================================================================
    5. Splash 首页定制
    ========================================================================== */
+/* 顶部 Header 品牌 Logo：默认高度是 nav 高度（约 32px），这里显式固定为 32px。
+   未分层的规则优先于 Starlight 的 @layer。 */
+.site-title img {
+	height: 2rem;
+}
+
 div[data-template="splash"] h1:where(.astro-q2ezz3gc),
 div[data-template="splash"] .hero h1,
 h1[id="_top"] {
@@ -274,6 +300,14 @@ a.orion-clickable-card:hover .card {
 .orion-horizontal-links .orion-clickable-card .card .title,
 .orion-horizontal-links .orion-clickable-card .card p.title {
 	font-size: 1.15rem !important;
+}
+
+/* 暗色下卡片图标改用更亮的强调档：
+   `--sl-color-accent` 是按钮**底色**（#2f5fd0，配白字才够对比），拿它画图标
+   压在 #14232d 上只有 2.8:1，会显得发闷；`--sl-color-accent-high` 是同一套
+   「深色·蓝」里的前景档（#6694ff，5.6:1）。浅色主题不动。 */
+[data-theme='dark'] .orion-horizontal-links .custom-card-icon {
+	color: var(--sl-color-accent-high) !important;
 }
 
 /* 左侧绝对居中图标 */
