@@ -94,6 +94,19 @@ export default defineConfig({
                             // 在这里自动生成 build 文件夹下的内容
                             items: [{ autogenerate: { directory: 'howto/build', collapsed: true } }]
                         },
+                        {
+                            // 组织管理模块：模块标识 admin（目录名也用它），
+                            // 界面上叫「组织」（顶部导航抽屉入口 module.settings）。
+                            label: '组织',
+                            translations: {
+                                root: '组织',
+                                en: 'Organization',
+                                ja: '組織'
+                            },
+                            collapsed: true,
+                            // 自动生成 admin 文件夹下的内容
+                            items: [{ autogenerate: { directory: 'howto/admin', collapsed: true } }]
+                        },
                     ],
                 },
                 {
