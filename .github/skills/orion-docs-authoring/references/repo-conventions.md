@@ -40,7 +40,7 @@ src/content/docs/
 | `build` | 设计 | Build | 設計 |
 | `run` | 运行 | Run | 実行 |
 | `optimize` | 优化 | Optimize | 最適化 |
-| `admin` | 管理 | Admin | 管理 |
+| `admin` | 组织 | Organization | 組織 |
 
 **中文正文不要写「Build 模块」**——中文界面上它叫「设计」。同理日文写「設計」。
 反过来说，URL 与目录保持 `build`，别因为中文叫「设计」就把目录改回 `design`
