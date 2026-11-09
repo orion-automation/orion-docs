@@ -95,6 +95,19 @@ export default defineConfig({
                             items: [{ autogenerate: { directory: 'howto/build', collapsed: true } }]
                         },
                         {
+                            // 流程运行模块：模块标识 run（目录名也用它），
+                            // 界面上叫「运行」（顶部导航抽屉入口 module.run）。
+                            label: '运行',
+                            translations: {
+                                root: '运行',
+                                en: 'Run',
+                                ja: '実行'
+                            },
+                            collapsed: true,
+                            // 自动生成 run 文件夹下的内容
+                            items: [{ autogenerate: { directory: 'howto/run', collapsed: true } }]
+                        },
+                        {
                             // 组织管理模块：模块标识 admin（目录名也用它），
                             // 界面上叫「组织」（顶部导航抽屉入口 module.settings）。
                             label: '组织',
