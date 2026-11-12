@@ -97,6 +97,7 @@ export default defineConfig({
                         {
                             // 流程运行模块：模块标识 run（目录名也用它），
                             // 界面上叫「运行」（顶部导航抽屉入口 module.run）。
+                            // 分组镜像产品左侧栏的 tab；新文档要手动加到对应 tab 组里。
                             label: '运行',
                             translations: {
                                 root: '运行',
@@ -104,12 +105,77 @@ export default defineConfig({
                                 ja: '実行'
                             },
                             collapsed: true,
-                            // 自动生成 run 文件夹下的内容
-                            items: [{ autogenerate: { directory: 'howto/run', collapsed: true } }]
+                            items: [
+                                {
+                                    label: '看板',
+                                    translations: {
+                                        root: '看板',
+                                        en: 'Dashboard',
+                                        ja: 'ダッシュボード'
+                                    },
+                                    items: ['howto/run/dashboard']
+                                },
+                                {
+                                    label: '流程定义',
+                                    translations: {
+                                        root: '流程定义',
+                                        en: 'Process Definitions',
+                                        ja: 'プロセス定義'
+                                    },
+                                    items: ['howto/run/process', 'howto/run/process-action']
+                                },
+                                {
+                                    label: '决策',
+                                    translations: {
+                                        root: '决策',
+                                        en: 'Decisions',
+                                        ja: 'デシジョン'
+                                    },
+                                    items: ['howto/run/decision']
+                                },
+                                {
+                                    label: '部署',
+                                    translations: {
+                                        root: '部署',
+                                        en: 'Deployments',
+                                        ja: 'デプロイ'
+                                    },
+                                    items: ['howto/run/deployment']
+                                },
+                                {
+                                    label: 'Job执行器',
+                                    translations: {
+                                        root: 'Job执行器',
+                                        en: 'Job Executor',
+                                        ja: 'Job 実行器'
+                                    },
+                                    items: ['howto/run/job']
+                                },
+                                {
+                                    label: '批处理',
+                                    translations: {
+                                        root: '批处理',
+                                        en: 'Batch',
+                                        ja: 'バッチ'
+                                    },
+                                    items: ['howto/run/batch']
+                                },
+                                {
+                                    // 一篇覆盖产品的「用户操作日志」「历史清理」两个 tab。
+                                    label: '用户操作日志与历史清理',
+                                    translations: {
+                                        root: '用户操作日志与历史清理',
+                                        en: 'User Operation Log & History Cleanup',
+                                        ja: 'ユーザー操作ログと履歴クリーンアップ'
+                                    },
+                                    items: ['howto/run/audit']
+                                }
+                            ]
                         },
                         {
                             // 组织管理模块：模块标识 admin（目录名也用它），
                             // 界面上叫「组织」（顶部导航抽屉入口 module.settings）。
+                            // 分组镜像产品左侧栏的 tab；新文档要手动加到对应 tab 组里。
                             label: '组织',
                             translations: {
                                 root: '组织',
@@ -117,8 +183,62 @@ export default defineConfig({
                                 ja: '組織'
                             },
                             collapsed: true,
-                            // 自动生成 admin 文件夹下的内容
-                            items: [{ autogenerate: { directory: 'howto/admin', collapsed: true } }]
+                            items: [
+                                {
+                                    label: '看板',
+                                    translations: {
+                                        root: '看板',
+                                        en: 'Dashboard',
+                                        ja: 'ダッシュボード'
+                                    },
+                                    items: ['howto/admin/dashboard']
+                                },
+                                {
+                                    label: '用户',
+                                    translations: {
+                                        root: '用户',
+                                        en: 'Users',
+                                        ja: 'ユーザー'
+                                    },
+                                    items: ['howto/admin/user']
+                                },
+                                {
+                                    label: '组',
+                                    translations: {
+                                        root: '组',
+                                        en: 'Groups',
+                                        ja: 'グループ'
+                                    },
+                                    items: ['howto/admin/group']
+                                },
+                                {
+                                    label: '租户',
+                                    translations: {
+                                        root: '租户',
+                                        en: 'Tenants',
+                                        ja: 'テナント'
+                                    },
+                                    items: ['howto/admin/tenant']
+                                },
+                                {
+                                    label: '授权',
+                                    translations: {
+                                        root: '授权',
+                                        en: 'Authorization',
+                                        ja: '認可'
+                                    },
+                                    items: ['howto/admin/authorization']
+                                },
+                                {
+                                    label: '系统',
+                                    translations: {
+                                        root: '系统',
+                                        en: 'System',
+                                        ja: 'システム'
+                                    },
+                                    items: ['howto/admin/system']
+                                }
+                            ]
                         },
                     ],
                 },
