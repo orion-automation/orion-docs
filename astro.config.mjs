@@ -104,6 +104,10 @@ export default defineConfig({
                                     items: [
                                         'howto/build/workspace',
                                         'howto/build/workspace-detail',
+                                        'howto/build/workspace-apps',
+                                        'howto/build/workspace-resources',
+                                        'howto/build/workspace-runs',
+                                        'howto/build/workspace-readme',
                                         'howto/build/app',
                                         'howto/build/editor',
                                         'howto/build/publish'
@@ -117,7 +121,15 @@ export default defineConfig({
                                         ja: 'ケイパビリティセンター'
                                     },
                                     collapsed: true,
-                                    items: ['howto/build/components']
+                                    items: [
+                                        'howto/build/components',
+                                        'howto/build/connector',
+                                        'howto/build/worker',
+                                        'howto/build/skill',
+                                        'howto/build/agent',
+                                        'howto/build/model',
+                                        'howto/build/idp'
+                                    ]
                                 },
                                 {
                                     label: '我的引擎',
