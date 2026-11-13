@@ -69,7 +69,7 @@ export default defineConfig({
                         en: 'Quick Start'
                     },
                     collapsed: true,
-                    items: [{ autogenerate: { directory: 'guides' } }],
+                    items: [{ autogenerate: { directory: 'guides', collapsed: true } }],
                 },
                 {
                     label: '操作指南',
@@ -100,6 +100,7 @@ export default defineConfig({
                                         en: 'Workspace',
                                         ja: 'ワークスペース'
                                     },
+                                    collapsed: true,
                                     items: [
                                         'howto/build/workspace',
                                         'howto/build/workspace-detail',
@@ -115,6 +116,7 @@ export default defineConfig({
                                         en: 'Capability Center',
                                         ja: 'ケイパビリティセンター'
                                     },
+                                    collapsed: true,
                                     items: ['howto/build/components']
                                 },
                                 {
@@ -124,6 +126,7 @@ export default defineConfig({
                                         en: 'My Engines',
                                         ja: 'マイエンジン'
                                     },
+                                    collapsed: true,
                                     items: ['howto/build/engines']
                                 },
                                 {
@@ -133,6 +136,7 @@ export default defineConfig({
                                         en: 'DaVinci',
                                         ja: 'DaVinci'
                                     },
+                                    collapsed: true,
                                     items: ['howto/build/davinci']
                                 },
                                 {
@@ -142,6 +146,7 @@ export default defineConfig({
                                         en: 'Lab',
                                         ja: 'ラボ'
                                     },
+                                    collapsed: true,
                                     items: ['howto/build/lab']
                                 }
                             ]
@@ -165,6 +170,7 @@ export default defineConfig({
                                         en: 'Dashboard',
                                         ja: 'ダッシュボード'
                                     },
+                                    collapsed: true,
                                     items: ['howto/run/dashboard']
                                 },
                                 {
@@ -174,6 +180,7 @@ export default defineConfig({
                                         en: 'Process Definitions',
                                         ja: 'プロセス定義'
                                     },
+                                    collapsed: true,
                                     items: ['howto/run/process', 'howto/run/process-action']
                                 },
                                 {
@@ -183,6 +190,7 @@ export default defineConfig({
                                         en: 'Decisions',
                                         ja: 'デシジョン'
                                     },
+                                    collapsed: true,
                                     items: ['howto/run/decision']
                                 },
                                 {
@@ -192,6 +200,7 @@ export default defineConfig({
                                         en: 'Deployments',
                                         ja: 'デプロイ'
                                     },
+                                    collapsed: true,
                                     items: ['howto/run/deployment']
                                 },
                                 {
@@ -201,6 +210,7 @@ export default defineConfig({
                                         en: 'Job Executor',
                                         ja: 'Job 実行器'
                                     },
+                                    collapsed: true,
                                     items: ['howto/run/job']
                                 },
                                 {
@@ -210,6 +220,7 @@ export default defineConfig({
                                         en: 'Batch',
                                         ja: 'バッチ'
                                     },
+                                    collapsed: true,
                                     items: ['howto/run/batch']
                                 },
                                 {
@@ -220,6 +231,7 @@ export default defineConfig({
                                         en: 'User Operation Log & History Cleanup',
                                         ja: 'ユーザー操作ログと履歴クリーンアップ'
                                     },
+                                    collapsed: true,
                                     items: ['howto/run/audit']
                                 }
                             ]
@@ -243,6 +255,7 @@ export default defineConfig({
                                         en: 'Dashboard',
                                         ja: 'ダッシュボード'
                                     },
+                                    collapsed: true,
                                     items: ['howto/admin/dashboard']
                                 },
                                 {
@@ -252,6 +265,7 @@ export default defineConfig({
                                         en: 'Users',
                                         ja: 'ユーザー'
                                     },
+                                    collapsed: true,
                                     items: ['howto/admin/user']
                                 },
                                 {
@@ -261,6 +275,7 @@ export default defineConfig({
                                         en: 'Groups',
                                         ja: 'グループ'
                                     },
+                                    collapsed: true,
                                     items: ['howto/admin/group']
                                 },
                                 {
@@ -270,6 +285,7 @@ export default defineConfig({
                                         en: 'Tenants',
                                         ja: 'テナント'
                                     },
+                                    collapsed: true,
                                     items: ['howto/admin/tenant']
                                 },
                                 {
@@ -279,6 +295,7 @@ export default defineConfig({
                                         en: 'Authorization',
                                         ja: '認可'
                                     },
+                                    collapsed: true,
                                     items: ['howto/admin/authorization']
                                 },
                                 {
@@ -288,6 +305,7 @@ export default defineConfig({
                                         en: 'System',
                                         ja: 'システム'
                                     },
+                                    collapsed: true,
                                     items: ['howto/admin/system']
                                 }
                             ]
@@ -436,7 +454,7 @@ export default defineConfig({
                         en: 'Best Practices'
                     },
                     collapsed: true,
-                    items: [{ autogenerate: { directory: 'bestpractices' } }],
+                    items: [{ autogenerate: { directory: 'bestpractices', collapsed: true } }],
                 },
             ],
         }),
