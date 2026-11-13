@@ -138,7 +138,7 @@ Designer / 設計ビュー），从中文直译出来的英文名用户在界面
 
 ```bash
 # 机械规则检查（四型硬规则子集）
-node .github/skills/orion-docs-authoring/scripts/lint-diataxis.mjs src/content/docs/howto/build/project.mdx
+node .github/skills/orion-docs-authoring/scripts/lint-diataxis.mjs src/content/docs/howto/build/workspace.mdx
 
 # 或者整目录
 node .github/skills/orion-docs-authoring/scripts/lint-diataxis.mjs src/content/docs/howto

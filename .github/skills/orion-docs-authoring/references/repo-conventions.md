@@ -46,13 +46,13 @@ src/content/docs/
 反过来说，URL 与目录保持 `build`，别因为中文叫「设计」就把目录改回 `design`
 （会与旧链接冲突，也不是模块标识）。
 
-`guides` / `howto/build` / `reference/*` / `bestpractices` 在 `astro.config.mjs` 的
+`guides` / `reference/*` / `bestpractices` 在 `astro.config.mjs` 的
 `sidebar` 中已用 `autogenerate` 注册，**新文件放进这些目录即自动出现在侧边栏**。
 只有在新增一个顶层大类（新目录且不在任何 autogenerate 下）时才需要改配置。
 
-**例外：`howto/admin` 与 `howto/run` 是手工分组**——侧边栏按产品左侧栏的 tab 分组
-（组名与三语文案取自产品 i18n 的 `admin.nav.*` / `run.nav.*`），不再 autogenerate。
-**新增这两个目录的文档必须手动加进 `astro.config.mjs` 对应 tab 组的 `items` 里**
+**例外：`howto/admin`、`howto/run` 与 `howto/build` 是手工分组**——侧边栏按产品左侧栏的 tab 分组
+（组名与三语文案取自产品 i18n 的 `admin.nav.*` / `run.nav.*` / `build.nav.*`），不再 autogenerate。
+**新增这三个目录的文档必须手动加进 `astro.config.mjs` 对应 tab 组的 `items` 里**
 （`slug` 写站点内路径如 `howto/admin/user`，不带斜杠），否则不会出现在侧边栏。
 
 ## Frontmatter
@@ -257,6 +257,6 @@ npx astro dev stop
 | 类型 | 参考文件 |
 |---|---|
 | Tutorial | `src/content/docs/guides/deploy.mdx` |
-| How-to | `src/content/docs/howto/build/project.mdx` |
+| How-to | `src/content/docs/howto/build/workspace.mdx` |
 | Reference | `src/content/docs/reference/bpmn/task/user.mdx` |
 | Explanation | `src/content/docs/bestpractices/aboutboatengine.mdx` |

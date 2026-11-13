@@ -18,7 +18,7 @@ directory such as `zh-cn/`, it produces 404 ghost routes).
 After writing, run the mechanical rule check:
 
 ```
-npm run docs:lint src/content/docs/howto/design/project.mdx
+npm run docs:lint src/content/docs/howto/build/workspace.mdx
 ```
 
 ## Documentation
