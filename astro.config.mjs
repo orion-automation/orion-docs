@@ -91,8 +91,60 @@ export default defineConfig({
                                 ja: '設計'
                             },
                             collapsed: true,
-                            // 在这里自动生成 build 文件夹下的内容
-                            items: [{ autogenerate: { directory: 'howto/build', collapsed: true } }]
+                            // 分组镜像产品左侧栏的 tab（build.nav.*）；新文档要手动加到对应 tab 组里。
+                            items: [
+                                {
+                                    label: '工作空间',
+                                    translations: {
+                                        root: '工作空间',
+                                        en: 'Workspace',
+                                        ja: 'ワークスペース'
+                                    },
+                                    items: [
+                                        'howto/build/workspace',
+                                        'howto/build/workspace-detail',
+                                        'howto/build/app',
+                                        'howto/build/editor',
+                                        'howto/build/publish'
+                                    ]
+                                },
+                                {
+                                    label: '能力中心',
+                                    translations: {
+                                        root: '能力中心',
+                                        en: 'Capability Center',
+                                        ja: 'ケイパビリティセンター'
+                                    },
+                                    items: ['howto/build/components']
+                                },
+                                {
+                                    label: '我的引擎',
+                                    translations: {
+                                        root: '我的引擎',
+                                        en: 'My Engines',
+                                        ja: 'マイエンジン'
+                                    },
+                                    items: ['howto/build/engines']
+                                },
+                                {
+                                    label: 'DaVinci',
+                                    translations: {
+                                        root: 'DaVinci',
+                                        en: 'DaVinci',
+                                        ja: 'DaVinci'
+                                    },
+                                    items: ['howto/build/davinci']
+                                },
+                                {
+                                    label: '实验室',
+                                    translations: {
+                                        root: '实验室',
+                                        en: 'Lab',
+                                        ja: 'ラボ'
+                                    },
+                                    items: ['howto/build/lab']
+                                }
+                            ]
                         },
                         {
                             // 流程运行模块：模块标识 run（目录名也用它），
