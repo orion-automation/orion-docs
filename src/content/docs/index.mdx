@@ -20,7 +20,7 @@ hero:
 <blockquote class="stoic-quote">
   <p>“Look within. Within is the fountain of good, and it will ever bubble up, if thou wilt ever dig. / 向内去挖掘吧！向内是你善的泉源，只要你不断地挖掘，它就会不断地涌出。”</p>
   <cite>
-    — <strong>马可·奥勒留</strong> (Marcus Aurelius, 121–180 AD), 
+    — <strong>马可·奥勒留</strong> (Marcus Aurelius, 121–180 AD),
     <a href="https://en.wikipedia.org/wiki/Meditations" target="_blank">《沉思录》, 第七卷</a>
   </cite>
 </blockquote>
@@ -33,21 +33,21 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 <div class="orion-horizontal-links">
   <CardGrid>
-    
-    <a href="/guides/first-process/" class="orion-clickable-card">
+
+    <a href={`${import.meta.env.BASE_URL}/guides/first-process/`} class="orion-clickable-card">
       <Card title="构建一个AI Native的业务流程">
         <Icon name="lucide:pencil-sparkles" class="custom-card-icon" />
         从创建工作空间到部署运行，一步步做出你的第一条流程。
       </Card>
     </a>
 
-    <a href="/guides/deploy" class="orion-clickable-card">
+    <a href={`${import.meta.env.BASE_URL}/guides/deploy`} class="orion-clickable-card">
       <Card title="快速部署ORION">
         <Icon name="lucide:hard-drive-download" class="custom-card-icon" />
         基于 Docker Compose 的标准化快速部署方案。
       </Card>
     </a>
-	
+
 
   </CardGrid>
 </div>
@@ -55,25 +55,25 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 ## 了解更多
 
- 
+
 <div class="orion-horizontal-links">
   <CardGrid>
-    
-    <a href="/howto/build/workspace/" class="orion-clickable-card">
+
+    <a href={`${import.meta.env.BASE_URL}/howto/build/workspace/`} class="orion-clickable-card">
       <Card title="使用指南">
         <Icon name="lucide:book-open-check" class="custom-card-icon" />
         覆盖ORION从业务建模、执行到持续优化的全链路企业级智动化功能操作。
       </Card>
     </a>
 
-    <a href="/reference/api/" target="_blank" class="orion-clickable-card">
+    <a href={`${import.meta.env.BASE_URL}/reference/api/`} target="_blank" class="orion-clickable-card">
       <Card title="API参考">
         <Icon name="lucide:unplug" class="custom-card-icon" />
         通过REST API，实现对ORION产品功能的集成、控制以及使用ORION作为底座的应用开发。
       </Card>
     </a>
 
-    <a href="/bestpractices/integration/" class="orion-clickable-card">
+    <a href={`${import.meta.env.BASE_URL}/bestpractices/integration/`} class="orion-clickable-card">
       <Card title="最佳实践">
         <Icon name="lucide:lightbulb" class="custom-card-icon" />
         涵盖流程设计范式、系统设计窍门、深度应用详解及行业实战案例，构建企业自动化的方法论体系。
@@ -106,7 +106,7 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 <div class="orion-wiki-section">
   <p>
-    <strong>ORION 猎户座：</strong> 
+    <strong>ORION 猎户座：</strong>
     赤道带星座之一，因其结构内拥有众多高亮度恒星、特殊星云（如 M42）及标志性的“猎户三星”，成为夜空中几何结构最稳定、最易被观测的星座。在古老航海学中，它不用于模糊地指引方向，而是作为测定天体坐标与空间边界的<strong>核心基准</strong>。
   </p>
 </div>

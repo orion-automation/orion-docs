@@ -20,7 +20,7 @@ hero:
 <blockquote class="stoic-quote">
   <p>“内へ向かえ。内には善の泉があり、それは掘り下げればいつでも湧き出る。”</p>
   <cite>
-    — <strong>マルクス・アウレリウス</strong> (Marcus Aurelius, 121–180 AD), 
+    — <strong>マルクス・アウレリウス</strong> (Marcus Aurelius, 121–180 AD),
     <a href="https://ja.wikipedia.org/wiki/自省録" target="_blank">『自省録』 (Meditations), 第7巻</a>
   </cite>
 </blockquote>
@@ -33,8 +33,8 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 <div class="orion-horizontal-links">
   <CardGrid>
-    
-    <a href="/ja/guides/first-process/" class="orion-clickable-card">
+
+    <a href={`${import.meta.env.BASE_URL}/ja/guides/first-process/`} class="orion-clickable-card">
       <Card title="AIネイティブな業務プロセスの構築">
         <Icon name="lucide:pencil-sparkles" class="custom-card-icon" />
         ワークスペースの作成からデプロイ・実行まで、最初のプロセスを一歩ずつ作ります。
@@ -55,8 +55,8 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 <div class="orion-horizontal-links">
   <CardGrid>
-    
-    <a href="/ja/howto/build/workspace/" class="orion-clickable-card">
+
+    <a href={`${import.meta.env.BASE_URL}/ja/howto/build/workspace/`} class="orion-clickable-card">
       <Card title="操作ガイド">
         <Icon name="lucide:book-open-check" class="custom-card-icon" />
         業務モデリング、実行から継続的な最適化まで、ORIONのフルリンクにわたるエンタープライズ向けインテリジェント自動化機能の操作を網羅しています。
@@ -103,7 +103,7 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 <div class="orion-wiki-section">
   <p>
-    <strong>ORION：</strong> 
+    <strong>ORION：</strong>
     天の赤道上に位置する星座の一つ。多数の高輝度星、特徴的な星雲（M42など）、そして象徴的な「オリオンの三つ星」により、夜空で最も幾何学構造が安定し、観測が容易な星座として知られている。古の航海術においては、曖昧に方向を指し示すものではなく、天体座標と空間の境界を測定するための<strong>核心的な基準（ベースライン）</strong>として用いられた。
   </p>
 </div>

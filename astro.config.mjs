@@ -9,7 +9,8 @@ import rehypeKatex from 'rehype-katex';
 
 // https://astro.build/config
 export default defineConfig({
-    site: 'https://docs.eorion.com',
+    site: 'https://dpa.eorionsolution.com/docs/',
+    base: '/docs',
     integrations: [
         icon(),
         mermaid({

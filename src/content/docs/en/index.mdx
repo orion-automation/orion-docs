@@ -20,7 +20,7 @@ hero:
 <blockquote class="stoic-quote">
   <p>“Look within. Within is the fountain of good, and it will ever bubble up, if thou wilt ever dig.”</p>
   <cite>
-    — <strong>Marcus Aurelius</strong> (121–180 AD), 
+    — <strong>Marcus Aurelius</strong> (121–180 AD),
     <a href="https://en.wikipedia.org/wiki/Meditations" target="_blank"><em>Meditations</em>, Book VII</a>
   </cite>
 </blockquote>
@@ -33,8 +33,8 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 <div class="orion-horizontal-links">
   <CardGrid>
-    
-    <a href="/en/guides/first-process/" class="orion-clickable-card">
+
+    <a href={`${import.meta.env.BASE_URL}/en/guides/first-process/`} class="orion-clickable-card">
       <Card title="Build an AI-Native Business Process">
         <Icon name="lucide:pencil-sparkles" class="custom-card-icon" />
         From creating a workspace to deploying and running it, build your first process step by step.
@@ -55,8 +55,8 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 <div class="orion-horizontal-links">
   <CardGrid>
-    
-    <a href="/en/howto/build/workspace/" class="orion-clickable-card">
+
+    <a href={`${import.meta.env.BASE_URL}/en/howto/build/workspace/`} class="orion-clickable-card">
       <Card title="User Guides">
         <Icon name="lucide:book-open-check" class="custom-card-icon" />
         Comprehensive guides covering the end-to-end lifecycle of ORION, from business modeling and execution to continuous optimization.
@@ -103,7 +103,7 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 <div class="orion-wiki-section">
   <p>
-    <strong>ORION：</strong> 
+    <strong>ORION：</strong>
     A prominent constellation located on the celestial equator. Boasting numerous high-luminosity stars, distinct nebulae (such as M42), and its iconic "Orion's Belt," it is recognized as one of the most structurally stable and easily observable constellations in the night sky. In ancient navigation, rather than offering vague direction, it served as a <strong>core baseline</strong> for determining celestial coordinates and spatial boundaries.
   </p>
 </div>
