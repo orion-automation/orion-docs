@@ -6,11 +6,22 @@ import starlightThemeRapide from 'starlight-theme-rapide'
 import mermaid from 'astro-mermaid';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import remarkBaseLinks from './remark-base-links.mjs';
+
+// ── 部署路径（site 与 base 的唯一来源）──────────────────────────────────
+// 默认挂 https://<域名>/docs/ 子路径（与当前线上一致）。
+// 想部署到域名根目录，构建时加环境变量即可，两处自动同步：
+//   DOCS_BASE=/ npm run build
+// 换域名同理：DOCS_ORIGIN=https://example.com DOCS_BASE=/docs npm run build
+const ORIGIN = process.env.DOCS_ORIGIN ?? 'https://dpa.eorionsolution.com';
+const rawBase = process.env.DOCS_BASE ?? '/docs';
+const base = rawBase === '/' ? '/' : `/${rawBase.replace(/^\/+|\/+$/g, '')}`;
+const site = base === '/' ? `${ORIGIN}/` : `${ORIGIN}${base}/`;
 
 // https://astro.build/config
 export default defineConfig({
-    site: 'https://dpa.eorionsolution.com/docs/',
-    base: '/docs',
+    site,
+    base,
     integrations: [
         icon(),
         mermaid({
@@ -18,6 +29,9 @@ export default defineConfig({
         }),
         starlight({
             plugins: [starlightThemeRapide()],
+            // frontmatter 链接（如 splash 首页 hero 按钮）不走 Markdown 管线，
+            // 由路由数据中间件补 base 前缀（见 src/starlightRouteData.ts）。
+            routeMiddleware: './src/starlightRouteData.ts',
             logo: {
                 // 与前端应用（packages/ui/src/components/AppLayout.vue）保持一致：
                 // 浅色用品牌蓝 orilogo.svg，深色用 orilogogrey.svg
@@ -474,7 +488,8 @@ export default defineConfig({
     ],
     markdown: {
     // 开启数学公式解析
-    remarkPlugins: [remarkMath],
+    // remarkMath + 给正文里的站内绝对链接/图片/JSX 属性补 base 前缀（根目录部署时为空操作）
+    remarkPlugins: [remarkMath, [remarkBaseLinks, { base }]],
     rehypePlugins: [rehypeKatex],
   },
 });
