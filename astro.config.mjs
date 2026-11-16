@@ -8,11 +8,11 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import remarkBaseLinks from './remark-base-links.mjs';
 
-const base='/';
+const base='/docs/';
 
 // https://astro.build/config
 export default defineConfig({
-    site: 'https://docs.eorion.com',
+    site: 'https://oriorioin.cn/docs',
     base,
     integrations: [
         icon(),
