@@ -8,19 +8,11 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import remarkBaseLinks from './remark-base-links.mjs';
 
-// ── 部署路径（site 与 base 的唯一来源）──────────────────────────────────
-// 默认挂 https://<域名>/docs/ 子路径（与当前线上一致）。
-// 想部署到域名根目录，构建时加环境变量即可，两处自动同步：
-//   DOCS_BASE=/ npm run build
-// 换域名同理：DOCS_ORIGIN=https://example.com DOCS_BASE=/docs npm run build
-const ORIGIN = process.env.DOCS_ORIGIN ?? 'https://dpa.eorionsolution.com';
-const rawBase = process.env.DOCS_BASE ?? '/docs';
-const base = rawBase === '/' ? '/' : `/${rawBase.replace(/^\/+|\/+$/g, '')}`;
-const site = base === '/' ? `${ORIGIN}/` : `${ORIGIN}${base}/`;
+const base='/';
 
 // https://astro.build/config
 export default defineConfig({
-    site,
+    site: 'https://docs.eorion.com',
     base,
     integrations: [
         icon(),
