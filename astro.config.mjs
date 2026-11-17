@@ -190,7 +190,12 @@ export default defineConfig({
                                         ja: 'ダッシュボード'
                                     },
                                     collapsed: true,
-                                    items: ['howto/run/dashboard']
+                                    items: [
+                                        'howto/run/dashboard',
+                                        'howto/run/dashboard/cards',
+                                        'howto/run/dashboard/trends',
+                                        'howto/run/dashboard/incidents'
+                                    ]
                                 },
                                 {
                                     label: '流程定义',
@@ -200,7 +205,19 @@ export default defineConfig({
                                         ja: 'プロセス定義'
                                     },
                                     collapsed: true,
-                                    items: ['howto/run/process', 'howto/run/process-action']
+                                    items: [
+                                        'howto/run/process',
+                                        'howto/run/process/view',
+                                        'howto/run/process/runtime',
+                                        'howto/run/process/history',
+                                        'howto/run/process/start',
+                                        'howto/run/process/suspend',
+                                        'howto/run/process/migrate',
+                                        'howto/run/process/modify',
+                                        'howto/run/process/restart',
+                                        'howto/run/process/analysis',
+                                        'howto/run/process/more'
+                                    ]
                                 },
                                 {
                                     label: '决策',
@@ -210,7 +227,7 @@ export default defineConfig({
                                         ja: 'デシジョン'
                                     },
                                     collapsed: true,
-                                    items: ['howto/run/decision']
+                                    items: ['howto/run/decision', 'howto/run/decision/simulation']
                                 },
                                 {
                                     label: '部署',
@@ -240,18 +257,57 @@ export default defineConfig({
                                         ja: 'バッチ'
                                     },
                                     collapsed: true,
-                                    items: ['howto/run/batch']
+                                    items: [
+                                        'howto/run/batch',
+                                        'howto/run/batch/track',
+                                        'howto/run/batch/delete',
+                                        'howto/run/batch/cleanable',
+                                        {
+                                            // 14 种类型 + 类型总览收进一个可折叠分组，避免把「批处理」组撑成长列。
+                                            // 默认收起；落在组内任一页时 Starlight 会自动展开。
+                                            label: '批处理类型',
+                                            collapsed: true,
+                                            items: [
+                                                'howto/run/batch/types',
+                                                'howto/run/batch/historic-instance-deletion',
+                                                'howto/run/batch/process-removal-time',
+                                                'howto/run/batch/instance-deletion',
+                                                'howto/run/batch/instance-suspension',
+                                                'howto/run/batch/set-job-retries',
+                                                'howto/run/batch/set-external-task-retries',
+                                                'howto/run/batch/set-variables',
+                                                'howto/run/batch/correlate-message',
+                                                'howto/run/batch/decision-instance-deletion',
+                                                'howto/run/batch/decision-removal-time',
+                                                'howto/run/batch/batch-removal-time',
+                                                'howto/run/batch/instance-modification',
+                                                'howto/run/batch/instance-migration',
+                                                'howto/run/batch/instance-restart'
+                                            ]
+                                        }
+                                    ]
                                 },
                                 {
-                                    // 一篇覆盖产品的「用户操作日志」「历史清理」两个 tab。
-                                    label: '用户操作日志与历史清理',
+                                    // 分组镜像产品左侧栏的两个独立 tab（run.nav.useroperation / run.nav.cleanup），
+                                    // 合并成一个组是当初「一篇覆盖两个 tab」的遗留。
+                                    label: '用户操作日志',
                                     translations: {
-                                        root: '用户操作日志与历史清理',
-                                        en: 'User Operation Log & History Cleanup',
-                                        ja: 'ユーザー操作ログと履歴クリーンアップ'
+                                        root: '用户操作日志',
+                                        en: 'User Operation Log',
+                                        ja: 'ユーザー操作ログ'
                                     },
                                     collapsed: true,
                                     items: ['howto/run/audit']
+                                },
+                                {
+                                    label: '历史清理',
+                                    translations: {
+                                        root: '历史清理',
+                                        en: 'History Cleanup',
+                                        ja: '履歴クリーンアップ'
+                                    },
+                                    collapsed: true,
+                                    items: ['howto/run/audit/cleanup']
                                 }
                             ]
                         },

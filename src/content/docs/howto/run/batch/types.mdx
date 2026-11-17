@@ -1,0 +1,43 @@
+---
+title: 如何选择批处理类型
+description: 如何在 ORION 新建批处理时按作用面挑选操作类型，以及每种类型的作用面、来源与跳转入口。
+---
+
+**前置条件**
+* 已登录 ORION，从顶部「打开应用菜单」进入「运行」，并在左侧导航点击「批处理」。
+
+**操作步骤**
+1. 点「新建批处理」，先看卡片所属的分组——分组就是**作用面**：已完成实例、运行中实例、决策实例、批处理本身。
+2. 在组内按要做的事挑一张卡片；拿不准时对照下表。
+3. 选中后进入向导，见 [如何新建批处理](/howto/run/batch/)。
+
+**预期结果**
+* 卡片分组与下表的「作用面」一一对应。
+* 表里标着「流程编辑页 / 流程迁移页 / 流程重启页」的三种不在新建入口里——它们各有自己的页面，创建后照样出现在批处理列表中。
+
+| 类型 | 作用面 | 从哪来 | 说明 |
+| --- | --- | --- | --- |
+| 历史流程实例删除 | 已完成实例 | 新建批处理 | [如何删除已完成流程实例](/howto/run/batch/historic-instance-deletion/) |
+| 流程历史清除时间 | 已完成实例 | 新建批处理 | [如何设置流程历史清除时间](/howto/run/batch/process-removal-time/) |
+| 流程实例删除 | 运行中实例 | 新建批处理 | [如何删除运行中流程实例](/howto/run/batch/instance-deletion/) |
+| 流程实例暂停／激活 | 运行中实例 | 新建批处理 | [如何批量挂起或激活流程实例](/howto/run/batch/instance-suspension/) |
+| 作业重试次数设置 | 运行中实例 | 新建批处理 | [如何设置作业重试次数](/howto/run/batch/set-job-retries/) |
+| 外部任务重试次数设置 | 运行中实例 | 新建批处理 | [如何设置外部任务重试次数](/howto/run/batch/set-external-task-retries/) |
+| 变量设置 | 运行中实例 | 新建批处理 | [如何批量设置流程实例变量](/howto/run/batch/set-variables/) |
+| 关联消息 | 运行中实例 | 新建批处理 | [如何批量关联消息](/howto/run/batch/correlate-message/) |
+| 历史决策实例删除 | 决策实例 | 新建批处理 | [如何删除已完成决策实例](/howto/run/batch/decision-instance-deletion/) |
+| 决策历史清除时间 | 决策实例 | 新建批处理 | [如何设置决策历史清除时间](/howto/run/batch/decision-removal-time/) |
+| 批次历史清除时间 | 批处理本身 | 新建批处理 | [如何设置批次历史清除时间](/howto/run/batch/batch-removal-time/) |
+| 流程实例修改 | 运行中实例 | 流程编辑页 | [如何批量修改流程实例](/howto/run/batch/instance-modification/) |
+| 流程实例迁移 | 运行中实例 | 流程迁移页 | [如何批量迁移流程实例](/howto/run/batch/instance-migration/) |
+| 流程实例重启 | 已完成实例 | 流程重启页 | [如何批量重启流程实例](/howto/run/batch/instance-restart/) |
+
+:::note[为什么有三种不在新建入口里]
+它们都要在流程图上点节点选位置，与向导的形态不同；两个入口做同一件事只会让人不知道该点哪个。
+:::
+
+## 相关篇目
+
+* 三步向导怎么走：[如何新建批处理](/howto/run/batch/)
+* 建完怎么跟：[如何跟踪批处理进度](/howto/run/batch/track/)
+* 单实例上的对应动作：[如何编辑运行中实例](/howto/run/process/modify/)、[如何迁移流程实例](/howto/run/process/migrate/)、[如何重启已结束实例](/howto/run/process/restart/)
