@@ -15,6 +15,8 @@
 
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, resolve, relative, sep } from 'node:path';
+// 与 Starlight 生成锚点用的是**同一份实现**。这里是它经 @astrojs/starlight 带进来的依赖。
+import { slug as githubSlug } from 'github-slugger';
 
 // ── 常量 ────────────────────────────────────────────────────────────────
 const TYPES = ['tutorial', 'howto', 'reference', 'explanation'];
@@ -63,18 +65,17 @@ const EMOJI = /[\u{1F000}-\u{1FAFF}]/u;
 const PLACEHOLDER_LINK = /\]\((?:url|URL|link|链接|待补|TODO)\)/;
 
 /**
- * 标题 → 锚点，与 Starlight（github-slugger）一致：
- * 小写、去掉标点、空格换连字符，中文与数字原样保留。
+ * 标题 → 锚点，**必须**与 Starlight 一致（它用 github-slugger 生成 `id`）。
  * 例：`## 1. 描述` → `1-描述`；`### 7.8 AI 对话助手` → `78-ai-对话助手`
+ *
+ * ⚠️ 这里曾是一段手写正则，全角标点（`：` `、` `（）` `／`）没被剥掉，于是：
+ *    · `link/anchor-not-found` 把**正确**的锚点报成 error；
+ *    · 真正断掉的那些（产物里 `：` 已被吃掉）反而一路放行。
+ *    ⇒ 不要再改回手写实现：全站 3511 个标题里有 1323 个会与它对不上。
+ * 先剥行内 HTML 与反引号（github-slugger 不认识它们，会把标签名留在 slug 里）。
  */
 function slugifyHeading(text) {
-	return text
-		.toLowerCase()
-		.replace(/<[^>]+>/g, '')
-		.replace(/`/g, '')
-		.replace(/[\u2000-\u206F\u2E00-\u2E7F]/g, '')
-		.replace(/[\0-\x1F!-,./:-@[-^`{-~\xA9\xAB-\xB4\xB6-\xB9\xBB-\xBF\xD7\xF7]/g, '')
-		.replace(/\s/g, '-');
+	return githubSlug(text.replace(/<[^>]+>/g, '').replace(/`/g, ''));
 }
 
 /**
